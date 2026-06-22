@@ -122,6 +122,26 @@ const badgeColors: Record<string, string> = {
   ADMIN: "bg-indigo-100 text-indigo-700",
   EDITOR: "bg-teal-100 text-teal-700",
   VIEWER: "bg-gray-100 text-gray-700",
+  // Extended outreach lifecycle
+  READY: "bg-cyan-100 text-cyan-700",
+  FOLLOW_UP_DUE: "bg-amber-100 text-amber-700",
+  INTERESTED: "bg-lime-100 text-lime-700",
+  ACCEPTED: "bg-green-100 text-green-700",
+  ARTICLE_DELIVERED: "bg-emerald-100 text-emerald-700",
+  // Raw input / insight / topic / briefing / article statuses
+  NEW: "bg-blue-100 text-blue-700",
+  PROCESSED: "bg-green-100 text-green-700",
+  NEEDS_REVIEW: "bg-amber-100 text-amber-700",
+  ARCHIVED: "bg-gray-100 text-gray-600",
+  APPROVED: "bg-green-100 text-green-700",
+  REJECTED: "bg-red-100 text-red-700",
+  PITCHED: "bg-indigo-100 text-indigo-700",
+  DELIVERED: "bg-emerald-100 text-emerald-700",
+  REVIEW: "bg-yellow-100 text-yellow-700",
+  // Levels
+  LOW: "bg-gray-100 text-gray-600",
+  MEDIUM: "bg-yellow-100 text-yellow-700",
+  HIGH: "bg-green-100 text-green-700",
 };
 
 export function Badge({ value }: { value: string }) {

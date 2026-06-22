@@ -2,8 +2,9 @@ import Link from "next/link";
 
 import { prisma } from "@/lib/prisma";
 import { requireTenant, canWrite } from "@/lib/tenant";
-import { deleteOutreachAction } from "@/actions/outreach";
+import { deleteOutreachAction, generatePitchAction } from "@/actions/outreach";
 import { DeleteButton } from "@/components/delete-button";
+import { ActionButton } from "@/components/action-button";
 import {
   Card,
   PageHeader,
@@ -31,11 +32,20 @@ export default async function OutreachPage() {
         title="Outreach"
         description="Ansprache von Medienkontakten je Kampagne"
         action={
-          writable && (
-            <LinkButton href="/dashboard/outreach/new">
-              Neue Outreach
+          <div className="flex gap-2">
+            <LinkButton
+              href="/api/export/outreach"
+              variant="secondary"
+              prefetch={false}
+            >
+              CSV-Export
             </LinkButton>
-          )
+            {writable && (
+              <LinkButton href="/dashboard/outreach/new">
+                Neue Outreach
+              </LinkButton>
+            )}
+          </div>
         }
       />
 
@@ -69,6 +79,11 @@ export default async function OutreachPage() {
                   <td className="px-5 py-3">
                     {writable && (
                       <div className="flex items-center justify-end gap-2">
+                        <ActionButton
+                          action={generatePitchAction}
+                          fields={{ id: o.id }}
+                          label="Pitch generieren"
+                        />
                         <Link
                           href={`/dashboard/outreach/${o.id}/edit`}
                           className="text-xs font-medium text-gray-700 underline"

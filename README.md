@@ -1,12 +1,20 @@
 # PR-Agent
 
-Eine Multi-Tenant SaaS-Grundlage für PR-Agenturen, Freelancer und
-Kommunikationsabteilungen. Der Fokus liegt bewusst auf einer **sauberen,
-sicheren SaaS-Basis** – noch ohne KI, Stripe oder Agenten.
+Eine Multi-Tenant SaaS-Plattform für PR-Agenturen, Freelancer und
+Kommunikationsabteilungen. Sie bildet den **gesamten PR-Prozess** ab – vom
+unsortierten Kunden-Input über strukturierte Erkenntnisse, Themenideen,
+Briefings und Artikelentwürfe bis zu Outreach, Veröffentlichungen und Reporting.
+
+> **Hinweis:** Es ist **noch keine echte KI** integriert. Die Workflow-Schritte
+> (Erkenntnisse ableiten, Themen generieren, Pitches/Briefings/Artikel
+> erstellen, Qualität prüfen) laufen über **Mock-Services** in `src/lib/`. Die
+> Architektur ist so geschnitten, dass diese Services später ohne Änderung der
+> Aufrufer (Actions/UI) durch KI-Aufrufe ersetzt werden können. Ebenso bewusst
+> ausgelassen: **Stripe/Billing** und autonome **Agenten**.
 
 ## Tech Stack
 
-- **Next.js** (App Router) + **TypeScript**
+- **Next.js** (App Router, Server Actions) + **TypeScript**
 - **PostgreSQL** + **Prisma**
 - **Auth.js** (NextAuth v5, Credentials, JWT-Sessions)
 - **Zod** für Validierung
@@ -18,23 +26,78 @@ sicheren SaaS-Basis** – noch ohne KI, Stripe oder Agenten.
 - **Rollen**: `OWNER`, `ADMIN`, `EDITOR`, `VIEWER` (Viewer = nur lesen).
 - **Strikte Tenant-Isolation**: Jede Datenbankabfrage wird nach
   `organizationId` gefiltert. Kein Nutzer sieht Daten anderer Organisationen.
-- **CRUD** für Kunden, Kampagnen, Medienkontakte und Outreach.
-- **CSV-Import** für Medienkontakte.
-- **Dashboard** mit Kennzahlen und letzten Aktivitäten.
+- **Kompletter PR-Workflow** je Kunde (siehe unten).
+- **CRUD** für Kunden, Kampagnen, Medienkontakte, Outreach sowie alle
+  Workflow-Objekte (Rohinformationen, Erkenntnisse, Themen, Briefings, Artikel,
+  Veröffentlichungen) und Schreibregeln.
+- **CSV-Import** für Medienkontakte und **CSV-Export** für Medienkontakte,
+  Outreach und Veröffentlichungen.
+- **Kunden-Dashboard mit Tabs** und **Kampagnen-Dashboard mit Kennzahlen**.
+- **Campaign Report** inkl. **externer Read-Only-Ansicht** über einen Share-Link.
 - **Seed-Daten** mit zwei fiktiven Organisationen (keine echten Personen/Medien).
+
+## PR-Workflow
+
+```
+Rohinformation  →  Erkenntnis  →  Themenidee  →  Briefing  →  Artikelentwurf
+(ClientRawInput)  (ClientInsight)  (TopicIdea)   (Briefing)   (ArticleDraft)
+                                       │                            │
+                                       └────────  Outreach  ────────┴──→ Veröffentlichung
+                                                 (Outreach)              (Publication)
+```
+
+1. **Client Intake** – beliebige Kundeninfos hochladen/einfügen
+   (`ClientRawInput`: Website-Texte, Transkripte, Briefings, E-Mails, Social,
+   Presskits, Notizen …).
+2. **Erkenntnisse** – `intakeProcessor` leitet (Mock) strukturierte
+   `ClientInsight`-Entwürfe ab (Positionierung, Expertise, Zielgruppe, Proof
+   Points, Zitate, Themenfelder, No-Gos, Risiken, fehlende Infos, Medienansätze).
+3. **Themen** – `topicManager` erzeugt aus freigegebenen Erkenntnissen
+   `TopicIdea`s inkl. Bewertung (Such-/Newswert, Priorität).
+4. **Briefings** – `briefingManager` baut aus einem Thema ein `Briefing`.
+5. **Artikel** – `articleBuilder` erzeugt einen `ArticleDraft`;
+   `articleQualityChecker` prüft ihn gegen ein `WritingRuleSet`.
+6. **Outreach** – erweiterter Lebenszyklus
+   (`draft → ready → sent → follow_up_due → interested → accepted → declined →
+   article_delivered → published`) inkl. Pitch-/Follow-up-Mail (Mock),
+   Follow-up-Daten und Notizen.
+7. **Veröffentlichungen** – platzierte Beiträge (`Publication`).
+8. **Reporting** – Kennzahlen je Kampagne, optional extern teilbar.
 
 ## Datenmodell
 
-| Modell         | Beschreibung                                | Tenant-Feld      |
-| -------------- | ------------------------------------------- | ---------------- |
-| `Organization` | Mandant (Tenant)                            | –                |
-| `User`         | Nutzer mit Rolle, gehört zu einer Org       | `organizationId` |
-| `Client`       | Auftraggeber / Kunde                        | `organizationId` |
-| `Campaign`     | PR-Kampagne eines Kunden                    | `organizationId` |
-| `MediaContact` | Journalist:in / Redaktion                   | `organizationId` |
-| `Outreach`     | Ansprache eines Kontakts in einer Kampagne  | `organizationId` |
+| Modell           | Beschreibung                                         | Tenant-Feld      |
+| ---------------- | --------------------------------------------------- | ---------------- |
+| `Organization`   | Mandant (Tenant)                                    | –                |
+| `User`           | Nutzer mit Rolle, gehört zu einer Org               | `organizationId` |
+| `Client`         | Auftraggeber / Kunde                                | `organizationId` |
+| `Campaign`       | PR-Kampagne eines Kunden (+ Share-Token für Report) | `organizationId` |
+| `MediaContact`   | Journalist:in / Redaktion                           | `organizationId` |
+| `Outreach`       | Ansprache eines Kontakts in einer Kampagne          | `organizationId` |
+| `ClientRawInput` | Unsortierte Kundeninformation (Intake)              | `organizationId` |
+| `ClientInsight`  | Strukturierte Erkenntnis zum Kunden                 | `organizationId` |
+| `TopicIdea`      | Themenidee / Story-Angle                            | `organizationId` |
+| `Briefing`       | Briefing für Pitch/Artikel                          | `organizationId` |
+| `ArticleDraft`   | Artikelentwurf                                      | `organizationId` |
+| `Publication`    | Veröffentlichung (platzierte Berichterstattung)     | `organizationId` |
+| `WritingRuleSet` | Schreibregeln für die spätere Artikel-Erstellung    | `organizationId` |
 
 Alle tenant-bezogenen Modelle besitzen eine `organizationId`.
+
+## Services (Mock, KI-ready)
+
+In `src/lib/` liegen die austauschbaren Workflow-Services – reine Funktionen
+(Daten rein, Daten raus), damit sie später 1:1 durch KI-Aufrufe ersetzt werden
+können:
+
+| Datei                                   | Aufgabe                                   |
+| --------------------------------------- | ----------------------------------------- |
+| `lib/intake/intakeProcessor.ts`         | Rohinfo → Erkenntnis-Vorschläge           |
+| `lib/topics/topicManager.ts`            | Erkenntnisse → Themenideen (mit Scoring)  |
+| `lib/outreach/outreachManager.ts`       | Pitch-/Follow-up-Mails, Status-Logik      |
+| `lib/briefings/briefingManager.ts`      | Thema → Briefing                          |
+| `lib/articles/articleBuilder.ts`        | Briefing (+ Regeln) → Artikelentwurf      |
+| `lib/articles/articleQualityChecker.ts` | Artikel gegen Schreibregeln prüfen        |
 
 ## Sicherheitskonzept
 
@@ -46,9 +109,14 @@ Die Mandantentrennung ist an einer zentralen Stelle verankert:
   `organizationId` in der `where`-Bedingung.
 - Updates/Deletes nutzen `updateMany`/`deleteMany` mit
   `{ id, organizationId }`, sodass fremde IDs ins Leere laufen.
-- Verknüpfungen (z. B. Kampagne → Kunde) werden vor dem Speichern darauf
-  geprüft, dass auch die referenzierten Datensätze zur Organisation gehören.
+- Verknüpfungen (z. B. Kampagne → Kunde, Briefing → Thema/Kontakt) werden vor
+  dem Speichern darauf geprüft, dass auch die referenzierten Datensätze zur
+  Organisation gehören.
 - Schreibaktionen erzwingen über `requireWriteAccess()` die passende Rolle.
+- Die **externe Read-Only-Ansicht** (`/report/<token>`) ist nur über einen
+  zufälligen, pro Kampagne aktivierbaren Share-Token erreichbar; sie liest
+  ausschließlich Daten der zugehörigen Organisation (über die Kampagne
+  abgeleitet) und lässt sich jederzeit wieder deaktivieren.
 
 ## Lokales Setup
 
@@ -109,6 +177,32 @@ Eine Beispieldatei liegt unter
 [`examples/media-contacts-sample.csv`](examples/media-contacts-sample.csv).
 Ungültige Zeilen werden übersprungen und im Ergebnis gemeldet.
 
+## CSV-Export
+
+Folgende Daten lassen sich (organisationsweit, tenant-isoliert) als CSV
+exportieren – Buttons befinden sich auf den jeweiligen Seiten:
+
+- Medienkontakte → `/api/export/media-contacts`
+- Outreach → `/api/export/outreach`
+- Veröffentlichungen → `/api/export/publications`
+
+## Campaign Report & externe Ansicht
+
+Jede Kampagne hat ein Dashboard (`/dashboard/campaigns/<id>`) mit Kennzahlen
+(Themen, Pitches, offene Follow-ups, Zusagen, Absagen, Veröffentlichungen).
+Über „Externen Report freigeben“ wird ein Share-Token erzeugt; die öffentliche,
+anmeldefreie Read-Only-Ansicht ist dann unter `/report/<token>` erreichbar und
+als Kundenreport nutzbar. In den Demo-Daten ist die Kampagne „Produktlaunch
+E-Bike 2026“ bereits freigegeben: `/report/demo-report-token`.
+
+## Schreibregeln
+
+Unter **Einstellungen → Schreibregeln** lassen sich `WritingRuleSet`s pflegen
+(Tonalität, bevorzugte Struktur, verbotene Formulierungen, Wortzahl-Grenzen).
+Sie werden vom `articleBuilder` und vom `articleQualityChecker` herangezogen –
+und bilden die Grundlage dafür, dass Artikel später regelkonform (auch per KI)
+erzeugt werden.
+
 ## Projektstruktur
 
 ```
@@ -122,13 +216,21 @@ src/
   lib/
     prisma.ts          # Prisma-Client-Singleton
     tenant.ts          # requireTenant / Rollen-Checks (Sicherheitskern)
+    action-helpers.ts  # writeAccess()-Helper für Server Actions
     validations.ts     # Zod-Schemas
-    csv.ts             # CSV-Parser
-  actions/             # Server Actions (CRUD, Auth, Import)
-  components/           # UI-Bausteine
+    csv.ts             # CSV-Parser + -Export
+    reporting.ts       # Kampagnen-Kennzahlen (Dashboard + Report)
+    intake/ topics/ outreach/ briefings/ articles/   # Mock-Services (KI-ready)
+  actions/             # Server Actions (CRUD, Auth, Import, Workflow)
+  components/           # UI-Bausteine (ui, delete-button, action-button, sidebar)
   app/
     (auth)/            # Login / Registrierung
     dashboard/         # Geschütztes Dashboard inkl. aller Module
+      clients/[id]/    # Kunden-Detail mit Tabs (Workflow)
+      campaigns/[id]/  # Kampagnen-Dashboard
+      settings/writing-rules/  # Schreibregeln-CRUD
+    report/[token]/    # Öffentliche Read-Only-Report-Ansicht
+    api/export/        # CSV-Exporte
 ```
 
 ## Verfügbare Skripte
@@ -146,8 +248,10 @@ src/
 
 ## Bewusst (noch) nicht enthalten
 
-- Keine KI / keine Agenten
-- Keine Stripe-/Billing-Integration
+- **Keine echte KI** – die Workflow-Schritte laufen über Mock-Services, die
+  als klare Erweiterungspunkte für spätere KI-Aufrufe dienen.
+- **Keine autonomen Agenten.**
+- **Keine Stripe-/Billing-Integration.**
 
-Zuerst die stabile SaaS-Basis – Erweiterungen folgen darauf.
-```
+Fokus: stabiles Datenmodell, sauberer Workflow und Skalierbarkeit. Erweiterungen
+(insbesondere KI) bauen auf dieser Basis auf.

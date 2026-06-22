@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -90,4 +91,35 @@ export async function deleteCampaignAction(formData: FormData): Promise<void> {
   });
 
   revalidatePath("/dashboard/campaigns");
+}
+
+/**
+ * Enables (and lazily creates a token for) or disables the external read-only
+ * report link of a campaign.
+ */
+export async function toggleCampaignShareAction(
+  formData: FormData,
+): Promise<void> {
+  const tenant = await requireWriteAccess();
+  const id = String(formData.get("id"));
+  const enable = formData.get("enable") === "true";
+
+  const campaign = await prisma.campaign.findFirst({
+    where: { id, organizationId: tenant.organizationId },
+    select: { id: true, shareToken: true },
+  });
+  if (!campaign) return;
+
+  await prisma.campaign.updateMany({
+    where: { id, organizationId: tenant.organizationId },
+    data: {
+      shareEnabled: enable,
+      shareToken:
+        enable && !campaign.shareToken
+          ? randomUUID().replace(/-/g, "")
+          : campaign.shareToken,
+    },
+  });
+
+  revalidatePath(`/dashboard/campaigns/${id}`);
 }

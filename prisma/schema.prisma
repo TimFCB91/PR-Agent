@@ -28,11 +28,83 @@ enum CampaignStatus {
   COMPLETED
 }
 
+// Generic low/medium/high rating reused across the PR workflow.
+enum Level {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// Extended outreach lifecycle covering the full pitch-to-publish process.
 enum OutreachStatus {
-  PLANNED
+  DRAFT
+  READY
   SENT
-  REPLIED
+  FOLLOW_UP_DUE
+  INTERESTED
+  ACCEPTED
   DECLINED
+  ARTICLE_DELIVERED
+  PUBLISHED
+}
+
+enum RawInputSourceType {
+  NOTE
+  WEBSITE
+  TRANSCRIPT
+  EMAIL
+  BRIEFING
+  SOCIAL
+  PRESSKIT
+  OTHER
+}
+
+enum RawInputStatus {
+  NEW
+  PROCESSED
+  NEEDS_REVIEW
+  ARCHIVED
+}
+
+enum InsightType {
+  POSITIONING
+  EXPERTISE
+  TARGET_GROUP
+  PROOF_POINT
+  QUOTE
+  TOPIC_FIELD
+  NO_GO
+  RISK
+  MISSING_INFO
+  MEDIA_ANGLE
+}
+
+enum InsightStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+}
+
+enum TopicStatus {
+  DRAFT
+  APPROVED
+  PITCHED
+  ARCHIVED
+}
+
+enum BriefingStatus {
+  DRAFT
+  APPROVED
+  DELIVERED
+}
+
+enum ArticleStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  SENT
+  PUBLISHED
+  ARCHIVED
 }
 
 // ----------------------------------------------------------------------------
@@ -46,11 +118,18 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users         User[]
-  clients       Client[]
-  campaigns     Campaign[]
-  mediaContacts MediaContact[]
-  outreaches    Outreach[]
+  users          User[]
+  clients        Client[]
+  campaigns      Campaign[]
+  mediaContacts  MediaContact[]
+  outreaches     Outreach[]
+  rawInputs      ClientRawInput[]
+  insights       ClientInsight[]
+  topicIdeas     TopicIdea[]
+  briefings      Briefing[]
+  articleDrafts  ArticleDraft[]
+  publications   Publication[]
+  writingRuleSets WritingRuleSet[]
 }
 
 model User {
@@ -63,13 +142,14 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rawInputs    ClientRawInput[]
 
   @@index([organizationId])
 }
 
 // ----------------------------------------------------------------------------
-// Domain models — all scoped by organizationId
+// Core domain models — all scoped by organizationId
 // ----------------------------------------------------------------------------
 
 model Client {
@@ -83,8 +163,14 @@ model Client {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  campaigns    Campaign[]
+  organization  Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaigns     Campaign[]
+  rawInputs     ClientRawInput[]
+  insights      ClientInsight[]
+  topicIdeas    TopicIdea[]
+  briefings     Briefing[]
+  articleDrafts ArticleDraft[]
+  publications  Publication[]
 
   @@index([organizationId])
 }
@@ -98,12 +184,19 @@ model Campaign {
   endDate        DateTime?
   clientId       String
   organizationId String
+  // External read-only report sharing.
+  shareToken     String?        @unique
+  shareEnabled   Boolean        @default(false)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  outreaches   Outreach[]
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  outreaches    Outreach[]
+  topicIdeas    TopicIdea[]
+  briefings     Briefing[]
+  articleDrafts ArticleDraft[]
+  publications  Publication[]
 
   @@index([organizationId])
   @@index([clientId])
@@ -122,8 +215,10 @@ model MediaContact {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   outreaches   Outreach[]
+  briefings    Briefing[]
+  publications Publication[]
 
   @@index([organizationId])
 }
@@ -132,8 +227,16 @@ model Outreach {
   id             String         @id @default(cuid())
   subject        String
   message        String?
-  status         OutreachStatus @default(PLANNED)
+  status         OutreachStatus @default(DRAFT)
   sentAt         DateTime?
+  // Extended PR-process fields.
+  pitchEmail        String?
+  followUpEmail     String?
+  lastContactDate   DateTime?
+  nextFollowUpDate  DateTime?
+  agreedTopic       String?
+  publicationUrl    String?
+  internalNotes     String?
   campaignId     String
   mediaContactId String
   organizationId String
@@ -147,4 +250,180 @@ model Outreach {
   @@index([organizationId])
   @@index([campaignId])
   @@index([mediaContactId])
+}
+
+// ----------------------------------------------------------------------------
+// PR workflow models
+// ----------------------------------------------------------------------------
+
+// 1. Client intake — any unstructured information about a client.
+model ClientRawInput {
+  id             String             @id @default(cuid())
+  title          String
+  sourceType     RawInputSourceType @default(NOTE)
+  rawText        String?
+  fileName       String?
+  status         RawInputStatus     @default(NEW)
+  clientId       String
+  createdById    String?
+  organizationId String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([clientId])
+}
+
+// 2. Structured insights derived from raw input.
+model ClientInsight {
+  id             String        @id @default(cuid())
+  insightType    InsightType
+  title          String
+  content        String?
+  confidence     Int           @default(50) // 0-100
+  status         InsightStatus @default(DRAFT)
+  clientId       String
+  organizationId String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([clientId])
+}
+
+// 3. Topic ideas / story angles.
+model TopicIdea {
+  id              String      @id @default(cuid())
+  title           String
+  description     String?
+  mediaAngle      String?
+  targetMediaType String?
+  searchPotential Level       @default(MEDIUM)
+  newsValue       Level       @default(MEDIUM)
+  priority        Level       @default(MEDIUM)
+  status          TopicStatus @default(DRAFT)
+  clientId        String
+  campaignId      String?
+  organizationId  String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign     Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  briefings    Briefing[]
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([campaignId])
+}
+
+// 4. Briefings for a pitch / article.
+model Briefing {
+  id                String         @id @default(cuid())
+  title             String
+  targetAudience    String?
+  angle             String?
+  keyMessages       String?
+  suggestedStructure String?
+  expertContext     String?
+  noGos             String?
+  status            BriefingStatus @default(DRAFT)
+  clientId          String
+  campaignId        String?
+  topicIdeaId       String?
+  mediaContactId    String?
+  organizationId    String
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign     Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  topicIdea    TopicIdea?    @relation(fields: [topicIdeaId], references: [id], onDelete: SetNull)
+  mediaContact MediaContact? @relation(fields: [mediaContactId], references: [id], onDelete: SetNull)
+  articleDrafts ArticleDraft[]
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([campaignId])
+}
+
+// 5. Article drafts.
+model ArticleDraft {
+  id              String        @id @default(cuid())
+  title           String
+  subtitle        String?
+  articleText     String?
+  metaDescription String?
+  targetMedium    String?
+  targetAudience  String?
+  status          ArticleStatus @default(DRAFT)
+  qualityNotes    String?
+  clientId        String
+  campaignId      String?
+  briefingId      String?
+  organizationId  String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign     Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  briefing     Briefing?    @relation(fields: [briefingId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([campaignId])
+}
+
+// 6. Publications (placed coverage).
+model Publication {
+  id              String    @id @default(cuid())
+  title           String
+  url             String?
+  publicationDate DateTime?
+  notes           String?
+  clientId        String
+  campaignId      String?
+  mediaContactId  String?
+  organizationId  String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign     Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  mediaContact MediaContact? @relation(fields: [mediaContactId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([campaignId])
+}
+
+// 10. Writing rule sets used to constrain article generation later.
+model WritingRuleSet {
+  id                String   @id @default(cuid())
+  name              String
+  description       String?
+  rules             String?
+  forbiddenPhrases  String[] @default([])
+  preferredStructure String?
+  toneOfVoice       String?
+  minWords          Int?
+  maxWords          Int?
+  organizationId    String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }

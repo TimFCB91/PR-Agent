@@ -16,7 +16,17 @@ import {
 
 type Action = (prev: FormState, formData: FormData) => Promise<FormState>;
 
-const STATUSES = ["PLANNED", "SENT", "REPLIED", "DECLINED"] as const;
+const STATUSES = [
+  "DRAFT",
+  "READY",
+  "SENT",
+  "FOLLOW_UP_DUE",
+  "INTERESTED",
+  "ACCEPTED",
+  "DECLINED",
+  "ARTICLE_DELIVERED",
+  "PUBLISHED",
+] as const;
 
 function toDateInput(value?: Date | string | null): string {
   if (!value) return "";
@@ -32,6 +42,13 @@ export interface OutreachFormValues {
   campaignId?: string;
   mediaContactId?: string;
   sentAt?: Date | string | null;
+  pitchEmail?: string | null;
+  followUpEmail?: string | null;
+  lastContactDate?: Date | string | null;
+  nextFollowUpDate?: Date | string | null;
+  agreedTopic?: string | null;
+  publicationUrl?: string | null;
+  internalNotes?: string | null;
 }
 
 export function OutreachForm({
@@ -113,7 +130,7 @@ export function OutreachForm({
             <Select
               id="status"
               name="status"
-              defaultValue={defaults?.status ?? "PLANNED"}
+              defaultValue={defaults?.status ?? "DRAFT"}
             >
               {STATUSES.map((s) => (
                 <option key={s} value={s}>
@@ -137,10 +154,77 @@ export function OutreachForm({
           <Textarea
             id="message"
             name="message"
-            rows={5}
+            rows={4}
             defaultValue={defaults?.message ?? ""}
           />
         </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="agreedTopic">Vereinbartes Thema</Label>
+            <Input
+              id="agreedTopic"
+              name="agreedTopic"
+              defaultValue={defaults?.agreedTopic ?? ""}
+            />
+          </div>
+          <div>
+            <Label htmlFor="publicationUrl">Veröffentlichungs-URL</Label>
+            <Input
+              id="publicationUrl"
+              name="publicationUrl"
+              defaultValue={defaults?.publicationUrl ?? ""}
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="lastContactDate">Letzter Kontakt</Label>
+            <Input
+              id="lastContactDate"
+              name="lastContactDate"
+              type="date"
+              defaultValue={toDateInput(defaults?.lastContactDate)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="nextFollowUpDate">Nächstes Follow-up</Label>
+            <Input
+              id="nextFollowUpDate"
+              name="nextFollowUpDate"
+              type="date"
+              defaultValue={toDateInput(defaults?.nextFollowUpDate)}
+            />
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="pitchEmail">Pitch-E-Mail</Label>
+          <Textarea
+            id="pitchEmail"
+            name="pitchEmail"
+            rows={4}
+            defaultValue={defaults?.pitchEmail ?? ""}
+          />
+        </div>
+        <div>
+          <Label htmlFor="followUpEmail">Follow-up-E-Mail</Label>
+          <Textarea
+            id="followUpEmail"
+            name="followUpEmail"
+            rows={3}
+            defaultValue={defaults?.followUpEmail ?? ""}
+          />
+        </div>
+        <div>
+          <Label htmlFor="internalNotes">Interne Notizen</Label>
+          <Textarea
+            id="internalNotes"
+            name="internalNotes"
+            rows={3}
+            defaultValue={defaults?.internalNotes ?? ""}
+          />
+        </div>
+
         <div className="flex gap-2">
           <Button type="submit" disabled={pending}>
             {pending ? "Speichern…" : submitLabel}

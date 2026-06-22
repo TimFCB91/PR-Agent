@@ -27,6 +27,25 @@ const optionalDate = z
     message: "Ungültiges Datum.",
   });
 
+// Optional foreign-key select: empty string -> undefined.
+const optionalId = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v === "" ? undefined : v));
+
+// Optional integer parsed from a form string.
+const optionalInt = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v === "" || v === undefined ? undefined : Number(v)))
+  .refine((v) => v === undefined || Number.isInteger(v), {
+    message: "Ganze Zahl erforderlich.",
+  });
+
+const levelEnum = z.enum(["LOW", "MEDIUM", "HIGH"]);
+
 // Auth -----------------------------------------------------------------------
 
 export const registerSchema = z.object({
@@ -79,13 +98,169 @@ export const mediaContactSchema = z.object({
 export const outreachSchema = z.object({
   subject: z.string().trim().min(1, "Betreff erforderlich."),
   message: optionalString,
-  status: z.enum(["PLANNED", "SENT", "REPLIED", "DECLINED"]),
+  status: z.enum([
+    "DRAFT",
+    "READY",
+    "SENT",
+    "FOLLOW_UP_DUE",
+    "INTERESTED",
+    "ACCEPTED",
+    "DECLINED",
+    "ARTICLE_DELIVERED",
+    "PUBLISHED",
+  ]),
   campaignId: z.string().trim().min(1, "Kampagne erforderlich."),
   mediaContactId: z.string().trim().min(1, "Medienkontakt erforderlich."),
   sentAt: optionalDate,
+  pitchEmail: optionalString,
+  followUpEmail: optionalString,
+  lastContactDate: optionalDate,
+  nextFollowUpDate: optionalDate,
+  agreedTopic: optionalString,
+  publicationUrl: optionalString,
+  internalNotes: optionalString,
+});
+
+// ClientRawInput (1) ----------------------------------------------------------
+
+export const rawInputSchema = z.object({
+  title: z.string().trim().min(1, "Titel erforderlich."),
+  sourceType: z.enum([
+    "NOTE",
+    "WEBSITE",
+    "TRANSCRIPT",
+    "EMAIL",
+    "BRIEFING",
+    "SOCIAL",
+    "PRESSKIT",
+    "OTHER",
+  ]),
+  rawText: optionalString,
+  fileName: optionalString,
+  status: z.enum(["NEW", "PROCESSED", "NEEDS_REVIEW", "ARCHIVED"]),
+});
+
+// ClientInsight (2) -----------------------------------------------------------
+
+export const insightSchema = z.object({
+  insightType: z.enum([
+    "POSITIONING",
+    "EXPERTISE",
+    "TARGET_GROUP",
+    "PROOF_POINT",
+    "QUOTE",
+    "TOPIC_FIELD",
+    "NO_GO",
+    "RISK",
+    "MISSING_INFO",
+    "MEDIA_ANGLE",
+  ]),
+  title: z.string().trim().min(1, "Titel erforderlich."),
+  content: optionalString,
+  confidence: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v === "" || v === undefined ? 50 : Number(v)))
+    .refine((v) => Number.isInteger(v) && v >= 0 && v <= 100, {
+      message: "Wert zwischen 0 und 100.",
+    }),
+  status: z.enum(["DRAFT", "APPROVED", "REJECTED"]),
+});
+
+// TopicIdea (3) ---------------------------------------------------------------
+
+export const topicSchema = z.object({
+  title: z.string().trim().min(1, "Titel erforderlich."),
+  description: optionalString,
+  mediaAngle: optionalString,
+  targetMediaType: optionalString,
+  searchPotential: levelEnum,
+  newsValue: levelEnum,
+  priority: levelEnum,
+  status: z.enum(["DRAFT", "APPROVED", "PITCHED", "ARCHIVED"]),
+  campaignId: optionalId,
+});
+
+// Briefing (4) ----------------------------------------------------------------
+
+export const briefingSchema = z.object({
+  title: z.string().trim().min(1, "Titel erforderlich."),
+  targetAudience: optionalString,
+  angle: optionalString,
+  keyMessages: optionalString,
+  suggestedStructure: optionalString,
+  expertContext: optionalString,
+  noGos: optionalString,
+  status: z.enum(["DRAFT", "APPROVED", "DELIVERED"]),
+  campaignId: optionalId,
+  topicIdeaId: optionalId,
+  mediaContactId: optionalId,
+});
+
+// ArticleDraft (5) ------------------------------------------------------------
+
+export const articleSchema = z.object({
+  title: z.string().trim().min(1, "Titel erforderlich."),
+  subtitle: optionalString,
+  articleText: optionalString,
+  metaDescription: optionalString,
+  targetMedium: optionalString,
+  targetAudience: optionalString,
+  status: z.enum([
+    "DRAFT",
+    "REVIEW",
+    "APPROVED",
+    "SENT",
+    "PUBLISHED",
+    "ARCHIVED",
+  ]),
+  qualityNotes: optionalString,
+  campaignId: optionalId,
+  briefingId: optionalId,
+});
+
+// Publication (6) -------------------------------------------------------------
+
+export const publicationSchema = z.object({
+  title: z.string().trim().min(1, "Titel erforderlich."),
+  url: optionalString,
+  publicationDate: optionalDate,
+  notes: optionalString,
+  campaignId: optionalId,
+  mediaContactId: optionalId,
+});
+
+// WritingRuleSet (10) ---------------------------------------------------------
+
+export const writingRuleSetSchema = z.object({
+  name: z.string().trim().min(1, "Name erforderlich."),
+  description: optionalString,
+  rules: optionalString,
+  // Newline-separated list -> string[].
+  forbiddenPhrases: z
+    .string()
+    .optional()
+    .transform((v) =>
+      (v ?? "")
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  preferredStructure: optionalString,
+  toneOfVoice: optionalString,
+  minWords: optionalInt,
+  maxWords: optionalInt,
 });
 
 export type ClientInput = z.infer<typeof clientSchema>;
 export type CampaignInput = z.infer<typeof campaignSchema>;
 export type MediaContactInput = z.infer<typeof mediaContactSchema>;
 export type OutreachInput = z.infer<typeof outreachSchema>;
+export type RawInputInput = z.infer<typeof rawInputSchema>;
+export type InsightInput = z.infer<typeof insightSchema>;
+export type TopicInput = z.infer<typeof topicSchema>;
+export type BriefingInput = z.infer<typeof briefingSchema>;
+export type ArticleInput = z.infer<typeof articleSchema>;
+export type PublicationInput = z.infer<typeof publicationSchema>;
+export type WritingRuleSetInput = z.infer<typeof writingRuleSetSchema>;

@@ -55,6 +55,10 @@ async function main() {
     },
   });
 
+  const acmeOwner = await prisma.user.findFirstOrThrow({
+    where: { organizationId: acme.id, role: "OWNER" },
+  });
+
   const acmeClientA = await prisma.client.create({
     data: {
       organizationId: acme.id,
@@ -85,6 +89,8 @@ async function main() {
       status: "ACTIVE",
       startDate: new Date("2026-03-01"),
       endDate: new Date("2026-06-30"),
+      shareToken: "demo-report-token",
+      shareEnabled: true,
     },
   });
 
@@ -135,8 +141,10 @@ async function main() {
       mediaContactId: acmeContacts[0].id,
       subject: "Exklusiv: Neues City-E-Bike",
       message: "Hallo Lena, gerne bieten wir Ihnen einen Vorab-Test an.",
-      status: "SENT",
+      status: "INTERESTED",
       sentAt: new Date("2026-03-05"),
+      lastContactDate: new Date("2026-03-12"),
+      agreedTopic: "Vorab-Test City-E-Bike",
     },
   });
 
@@ -146,7 +154,147 @@ async function main() {
       campaignId: acmeCampaign.id,
       mediaContactId: acmeContacts[1].id,
       subject: "Interviewangebot Geschäftsführung",
-      status: "PLANNED",
+      status: "FOLLOW_UP_DUE",
+      sentAt: new Date("2026-03-08"),
+      nextFollowUpDate: new Date("2026-03-20"),
+    },
+  });
+
+  await prisma.outreach.create({
+    data: {
+      organizationId: acme.id,
+      campaignId: acmeCampaign.id,
+      mediaContactId: acmeContacts[2].id,
+      subject: "Gastbeitrag zu E-Mobilität",
+      status: "PUBLISHED",
+      sentAt: new Date("2026-02-20"),
+      publicationUrl: "https://test-blog.test/e-mobilitaet",
+    },
+  });
+
+  // ---- PR workflow demo data for Acme ----
+  const acmeRaw = await prisma.clientRawInput.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      createdById: acmeOwner.id,
+      title: "Website-Text Über uns",
+      sourceType: "WEBSITE",
+      status: "PROCESSED",
+      rawText:
+        "Nordwind Mobility ist Marktführer für nachhaltige City-E-Bikes. Unser Team hat über 15 Jahre Erfahrung. Wachstum von 40 Prozent im letzten Jahr.",
+    },
+  });
+
+  await prisma.clientRawInput.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      createdById: acmeOwner.id,
+      title: "Gesprächsnotiz Geschäftsführung",
+      sourceType: "NOTE",
+      status: "NEW",
+      rawText: "Kurze Notiz.",
+    },
+  });
+
+  const acmeInsight = await prisma.clientInsight.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      insightType: "EXPERTISE",
+      title: "15+ Jahre Erfahrung in E-Mobilität",
+      content: "Langjährige Expertise als Aufhänger für Fachbeiträge.",
+      confidence: 70,
+      status: "APPROVED",
+    },
+  });
+
+  await prisma.clientInsight.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      insightType: "PROOF_POINT",
+      title: "40 % Wachstum",
+      content: "Starkes Wachstum als Zahlen-Story nutzbar.",
+      confidence: 65,
+      status: "APPROVED",
+    },
+  });
+
+  const acmeTopic = await prisma.topicIdea.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      campaignId: acmeCampaign.id,
+      title: "Wie E-Bikes die Innenstädte verändern",
+      description: "Trend-Story mit Einordnung durch Nordwind Mobility.",
+      mediaAngle: "Trend-Story mit Einordnung",
+      targetMediaType: "Online-Leitmedien",
+      searchPotential: "HIGH",
+      newsValue: "HIGH",
+      priority: "HIGH",
+      status: "APPROVED",
+    },
+  });
+
+  const acmeBriefing = await prisma.briefing.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      campaignId: acmeCampaign.id,
+      topicIdeaId: acmeTopic.id,
+      mediaContactId: acmeContacts[0].id,
+      title: "Briefing: E-Bikes in Innenstädten",
+      targetAudience: "Online-Leitmedien",
+      angle: "Trend-Story mit Einordnung",
+      keyMessages: "1. Verkehrswende\n2. 40 % Wachstum\n3. Nachhaltigkeit",
+      status: "APPROVED",
+    },
+  });
+
+  await prisma.articleDraft.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      campaignId: acmeCampaign.id,
+      briefingId: acmeBriefing.id,
+      title: "E-Bikes in Innenstädten",
+      subtitle: "Wie nachhaltige Mobilität die Stadt verändert",
+      articleText:
+        "## Einleitung\n\nStädte verändern sich.\n\n## Hauptteil\n\nNordwind Mobility ...\n\n## Fazit\n\nDie Zukunft ist elektrisch.",
+      targetMedium: "Online-Leitmedien",
+      status: "REVIEW",
+    },
+  });
+
+  await prisma.publication.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      campaignId: acmeCampaign.id,
+      mediaContactId: acmeContacts[2].id,
+      title: "Gastbeitrag: E-Mobilität im Alltag",
+      url: "https://test-blog.test/e-mobilitaet",
+      publicationDate: new Date("2026-03-01"),
+    },
+  });
+
+  // Reference the raw input + insight so unused-var checks stay clean.
+  void acmeRaw;
+  void acmeInsight;
+
+  await prisma.writingRuleSet.create({
+    data: {
+      organizationId: acme.id,
+      name: "Standard Fachartikel",
+      description: "Regeln für sachliche Fachbeiträge.",
+      rules: "Aktiv schreiben. Fachbegriffe erklären.",
+      forbiddenPhrases: ["weltbeste", "revolutionär", "marktführend"],
+      preferredStructure: "Einleitung\nProblem\nLösung\nBeleg\nFazit",
+      toneOfVoice: "sachlich, kompetent",
+      minWords: 400,
+      maxWords: 900,
     },
   });
 
@@ -205,7 +353,7 @@ async function main() {
       campaignId: globeCampaign.id,
       mediaContactId: globeContact.id,
       subject: "Finanzierungsrunde Polaris Software",
-      status: "REPLIED",
+      status: "INTERESTED",
       sentAt: new Date("2026-05-10"),
     },
   });

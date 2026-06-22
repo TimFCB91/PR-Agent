@@ -7,6 +7,10 @@ import { prisma } from "@/lib/prisma";
 import { requireWriteAccess, AccessDeniedError } from "@/lib/tenant";
 import { outreachSchema } from "@/lib/validations";
 import { fieldErrorsFromZod, type FormState } from "@/lib/form";
+import {
+  generatePitchEmail,
+  generateFollowUpEmail,
+} from "@/lib/outreach/outreachManager";
 
 // Make sure both the campaign and the media contact belong to the tenant
 // before an outreach links them together.
@@ -110,6 +114,41 @@ export async function deleteOutreachAction(formData: FormData): Promise<void> {
 
   await prisma.outreach.deleteMany({
     where: { id, organizationId: tenant.organizationId },
+  });
+
+  revalidatePath("/dashboard/outreach");
+}
+
+/**
+ * Workflow: generate pitch + follow-up email drafts for an outreach using the
+ * (mock) outreach manager, filling pitchEmail/followUpEmail.
+ */
+export async function generatePitchAction(formData: FormData): Promise<void> {
+  const tenant = await requireWriteAccess();
+  const id = String(formData.get("id"));
+
+  const outreach = await prisma.outreach.findFirst({
+    where: { id, organizationId: tenant.organizationId },
+    include: {
+      campaign: { select: { client: { select: { name: true } } } },
+      mediaContact: { select: { firstName: true, outlet: true } },
+    },
+  });
+  if (!outreach) return;
+
+  const ctx = {
+    contactFirstName: outreach.mediaContact.firstName,
+    contactOutlet: outreach.mediaContact.outlet,
+    clientName: outreach.campaign.client.name,
+    topicTitle: outreach.agreedTopic ?? outreach.subject,
+  };
+
+  await prisma.outreach.updateMany({
+    where: { id, organizationId: tenant.organizationId },
+    data: {
+      pitchEmail: generatePitchEmail(ctx),
+      followUpEmail: generateFollowUpEmail(ctx),
+    },
   });
 
   revalidatePath("/dashboard/outreach");
