@@ -12,6 +12,7 @@ import {
 } from "@/components/ui";
 import { DeleteButton } from "@/components/delete-button";
 import { ActionButton } from "@/components/action-button";
+import { QualityPanel } from "@/components/quality-panel";
 
 import {
   createRawInputAction,
@@ -919,6 +920,15 @@ async function BriefingsTab({
           </table>
         </Card>
       )}
+
+      <div className="mt-6 space-y-3">
+        {items.map((b) => (
+          <div key={b.id}>
+            <p className="text-sm font-medium text-gray-700">{b.title}</p>
+            <QualityPanel entityType="BRIEFING" entityId={b.id} clientId={clientId} organizationId={organizationId} writable={writable} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1030,6 +1040,15 @@ async function ArticlesTab({
           </table>
         </Card>
       )}
+
+      <div className="mt-6 space-y-3">
+        {items.map((a) => (
+          <div key={a.id}>
+            <p className="text-sm font-medium text-gray-700">{a.title}</p>
+            <QualityPanel entityType="ARTICLE" entityId={a.id} clientId={clientId} organizationId={organizationId} writable={writable} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -11,6 +11,11 @@ import { runBriefingAgent } from "@/lib/ai/agents/briefingAgent";
 import { runArticleAgent } from "@/lib/ai/agents/articleAgent";
 import { runMediaMatchingAgent } from "@/lib/ai/agents/mediaMatchingAgent";
 import { runFollowUpAgent, type FollowUpAgentInput } from "@/lib/ai/agents/followUpAgent";
+import {
+  buildClientEvidence,
+  getRuleSetForType,
+  runAndStoreQuality,
+} from "@/lib/quality/reportStore";
 
 function revClient(clientId: string) {
   revalidatePath(`/dashboard/clients/${clientId}`);
@@ -159,7 +164,7 @@ export async function buildBriefingViaAgentAction(
     { organizationId: tenant.organizationId, userId: tenant.userId },
   );
 
-  await prisma.briefing.create({
+  const briefing = await prisma.briefing.create({
     data: {
       organizationId: tenant.organizationId,
       clientId: topic.clientId,
@@ -174,6 +179,17 @@ export async function buildBriefingViaAgentAction(
       expertContext: result.expertContext,
       noGos: result.noGos,
     },
+    select: { id: true },
+  });
+
+  // Quality review of the briefing's key messages.
+  await runAndStoreQuality({
+    entityType: "BRIEFING",
+    entityId: briefing.id,
+    organizationId: tenant.organizationId,
+    text: result.keyMessages,
+    evidence: await buildClientEvidence(topic.clientId, tenant.organizationId),
+    ruleSet: await getRuleSetForType(tenant.organizationId, "BRIEFING"),
   });
 
   await prisma.topicIdea.updateMany({
@@ -227,7 +243,7 @@ export async function buildArticleViaAgentAction(
     { organizationId: tenant.organizationId, userId: tenant.userId },
   );
 
-  await prisma.articleDraft.create({
+  const article = await prisma.articleDraft.create({
     data: {
       organizationId: tenant.organizationId,
       clientId: briefing.clientId,
@@ -239,6 +255,25 @@ export async function buildArticleViaAgentAction(
       articleText: result.article,
       metaDescription: result.metaDescription,
     },
+    select: { id: true },
+  });
+
+  // Article quality engine: run all checks. Hard fact problems -> needs review;
+  // never auto-approve. The article goes to REVIEW unless it cannot be approved.
+  const report = await runAndStoreQuality({
+    entityType: "ARTICLE",
+    entityId: article.id,
+    organizationId: tenant.organizationId,
+    text: result.article,
+    evidence: await buildClientEvidence(briefing.clientId, tenant.organizationId),
+    ruleSet: await getRuleSetForType(tenant.organizationId, "ARTICLE"),
+  });
+
+  // Generated articles always land in REVIEW; approval is a manual quality step.
+  void report;
+  await prisma.articleDraft.updateMany({
+    where: { id: article.id, organizationId: tenant.organizationId },
+    data: { status: "REVIEW" },
   });
 
   await prisma.briefing.updateMany({
@@ -325,7 +360,7 @@ export async function generateFollowUpViaAgentAction(
   const outreach = await prisma.outreach.findFirst({
     where: { id, organizationId: tenant.organizationId },
     include: {
-      campaign: { select: { client: { select: { name: true } } } },
+      campaign: { select: { client: { select: { id: true, name: true } } } },
       mediaContact: { select: { firstName: true } },
     },
   });
@@ -344,6 +379,19 @@ export async function generateFollowUpViaAgentAction(
   await prisma.outreach.updateMany({
     where: { id, organizationId: tenant.organizationId },
     data: { followUpEmail: result.message },
+  });
+
+  // Quality review of the follow-up.
+  await runAndStoreQuality({
+    entityType: "FOLLOW_UP",
+    entityId: id,
+    organizationId: tenant.organizationId,
+    text: result.message,
+    evidence: await buildClientEvidence(
+      outreach.campaign.client.id,
+      tenant.organizationId,
+    ),
+    ruleSet: await getRuleSetForType(tenant.organizationId, "FOLLOW_UP"),
   });
 
   revalidatePath("/dashboard/outreach");

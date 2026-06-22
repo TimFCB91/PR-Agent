@@ -233,24 +233,47 @@ export const publicationSchema = z.object({
 
 // WritingRuleSet (10) ---------------------------------------------------------
 
+// Newline-separated textarea -> string[].
+const newlineList = z
+  .string()
+  .optional()
+  .transform((v) =>
+    (v ?? "")
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+
+// HTML checkbox: present ("on") -> true, absent -> false.
+const checkbox = z
+  .string()
+  .optional()
+  .transform((v) => v === "on" || v === "true");
+
 export const writingRuleSetSchema = z.object({
   name: z.string().trim().min(1, "Name erforderlich."),
   description: optionalString,
-  rules: optionalString,
-  // Newline-separated list -> string[].
-  forbiddenPhrases: z
-    .string()
-    .optional()
-    .transform((v) =>
-      (v ?? "")
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    ),
-  preferredStructure: optionalString,
+  textType: z.enum([
+    "PITCH",
+    "FOLLOW_UP",
+    "BRIEFING",
+    "ARTICLE",
+    "PRESS_RELEASE",
+    "LINKEDIN",
+    "OTHER",
+  ]),
+  targetMediumType: optionalString,
   toneOfVoice: optionalString,
+  rules: optionalString,
+  forbiddenPhrases: newlineList,
+  requiredElements: newlineList,
+  preferredStructure: optionalString,
   minWords: optionalInt,
   maxWords: optionalInt,
+  allowGendering: checkbox,
+  allowAnglicisms: checkbox,
+  allowFirstPerson: checkbox,
+  allowDirectClientMention: checkbox,
 });
 
 export type ClientInput = z.infer<typeof clientSchema>;

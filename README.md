@@ -85,6 +85,7 @@ Rohinformation  →  Erkenntnis  →  Themenidee  →  Briefing  →  Artikelent
 | `KnowledgeNode`  | Knoten im Wissensgraph                               | `organizationId` |
 | `KnowledgeEdge`  | Verbindung im Wissensgraph                           | `organizationId` |
 | `AIUsageLog`     | Protokoll aller KI-Agenten-Aufrufe                  | `organizationId` |
+| `TextQualityReport` | Qualitäts-/Faktencheck-Report je generiertem Text | `organizationId` |
 
 Alle tenant-bezogenen Modelle besitzen eine `organizationId`.
 
@@ -175,6 +176,67 @@ Für lokale Modelle (Ollama, vLLM, LM Studio): `AI_PROVIDER=local` +
 Jeder Agenten-Aufruf wird in **`AIUsageLog`** protokolliert (Agent, Provider,
 Modus, Modell, Tokens, Dauer, Erfolg, Nutzer) – tenant-isoliert. Einsehbar unter
 **Einstellungen → AI**.
+
+## Schreibregel-, Qualitäts- & Faktencheck-Engine
+
+Jeder generierte Text (Pitch, Follow-up, Briefing, Artikel) durchläuft eine
+redaktionelle Qualitätsprüfung – das System arbeitet wie ein PR-Lektorat, nicht
+wie ein generischer Textgenerator. Alle Prüfungen sind **reine Funktionen**
+(KI-ready), zentral verwaltet und werden von allen Agenten genutzt.
+
+### Schreibregel-Engine (`lib/writing/`)
+
+| Datei                          | Aufgabe                                                  |
+| ------------------------------ | ------------------------------------------------------- |
+| `rules.ts`                     | Zentrale, effektive Regeln (Stilprofil + Regelset)      |
+| `forbiddenPhrases.ts`          | Anti-KI-Floskel-Liste                                    |
+| `styleProfiles.ts`             | Stilprofile je Texttyp (Tonalität, Pflicht-Elemente)    |
+| `qualityChecklist.ts`          | Lektorats-Kriterien A–D als Daten + Runner              |
+| `textAnalyzer.ts`              | Metriken (Satzlänge, Passiv, Nominalstil, Wiederholung) |
+| `rewriteEngine.ts`             | Konservative Überarbeitung (entfernt nur, erfindet nie) |
+
+### Qualitäts- & Faktenchecks (`lib/quality/`)
+
+- **`factSafetyCheck.ts`** – Grundregel **keine erfundenen Fakten**: prüft den
+  Text gegen das im System hinterlegte Wissen (Rohinfos, Insights, Knowledge,
+  Briefing). Erkennt nicht belegte Zahlen, Zitate, Studien/Quellen und
+  Kundenreferenzen. Output: `{ passed, unsupportedClaims, missingEvidence, riskNotes }`.
+- **`claimReasonProofCheck.ts`** – **Behauptung + Begründung + Beleg**: erkennt
+  unbegründete, vage oder rein werbliche Aussagen.
+- **`aiPatternCheck.ts`** – Anti-KI-Floskel-System (Floskeln, Gedankenstrich-
+  Stil, Dreier-Adjektivketten, künstliche Antithesen). Output:
+  `{ passed, detectedPatterns, severity, rewriteRequired }`.
+- **`editorialChecklist.ts`** – Lektorats-Checkliste (A Inhalt, B Stil,
+  C PR-Tonalität, D Textlogik). Output: `{ score, passed, issues, recommendations, mustFix }`.
+
+### Article Quality Engine (`lib/articles/articleQualityEngine.ts`)
+
+Orchestriert alle Checks zu einem `QualityReport` mit Score, Status und
+`canApprove`. **Statuslogik** (`TextQualityStatus`):
+`generated → checked → needs_review → revised → approved → rejected`.
+
+Ein Text ist **nur freigebbar**, wenn alle vier Bedingungen erfüllt sind:
+FactSafety bestanden · AI-Pattern bestanden · Editorial-Score ≥ 85 · keine
+offenen `mustFix`. **Bei Faktenrisiken gibt es keine harte Freigabe** – auch
+nicht manuell.
+
+### Persistenz & UI
+
+Reports werden in **`TextQualityReport`** gespeichert (pro Entität, tenant-
+isoliert). Im UI erscheint bei Pitch, Follow-up (Outreach bearbeiten) sowie
+Briefing und Artikel (Kundenseite) ein Qualitätsbereich mit Score,
+Faktenproblemen, KI-Floskeln, Werblichkeit, Wiederholungen, Vorschlägen und den
+Buttons **Text überarbeiten**, **Manuell freigeben** und **Ablehnen**.
+
+### Writing Rule Sets
+
+`WritingRuleSet` steuert die Prüfung je Texttyp – Felder u. a. `textType`
+(`pitch`, `follow_up`, `briefing`, `article`, `press_release`, `linkedin`,
+`other`), `toneOfVoice`, `targetMediumType`, `requiredElements`,
+`forbiddenPhrases`, `minWords`/`maxWords`, `allowAnglicisms`, `allowFirstPerson`,
+`allowGendering`, `allowDirectClientMention`. Sechs Standard-Regelsets werden
+geseedet (PR-Pitch, Follow-up, Expertenartikel, Servicetext, Fachmedien-Beitrag,
+Kundenreport).
 
 ## Sicherheitskonzept
 
@@ -299,6 +361,8 @@ src/
     reporting.ts       # Kampagnen-Kennzahlen (Dashboard + Report)
     intake/ topics/ outreach/ briefings/ articles/   # Mock-Services (KI-ready)
     ai/                # AI-Layer: provider/, agents/, prompts.ts, knowledge/
+    writing/           # Schreibregel-Engine (rules, analyzer, rewrite, …)
+    quality/           # Fact-/Claim-/AI-Pattern-/Editorial-Checks + Report-Store
   actions/             # Server Actions (CRUD, Auth, Import, Workflow)
   components/           # UI-Bausteine (ui, delete-button, action-button, sidebar)
   app/

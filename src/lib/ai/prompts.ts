@@ -24,6 +24,13 @@ function buildJsonPrompt(params: {
       content:
         `${params.role}\n\n` +
         `Aufgabe: ${params.task}\n` +
+        // Shared editorial rules every agent must follow (FactSafety + Anti-KI).
+        `Schreibregeln: Verwende ausschließlich belegbare Informationen aus den ` +
+        `Eingabedaten — erfinde keine Fakten, Zahlen, Studien, Zitate, Quellen ` +
+        `oder Kundenreferenzen; markiere Fehlendes als offen. Schreibe ` +
+        `redaktionell statt werblich. Vermeide KI-Floskeln, Gedankenstriche als ` +
+        `Stilmittel, Dreier-Adjektivketten und generische Fazits. Aktiv statt ` +
+        `passiv, ein Gedanke pro Satz.\n` +
         `Antworte ausschließlich mit gültigem JSON in genau dieser Form (keine Erklärungen, kein Markdown):\n` +
         `${params.outputShape}`,
     },

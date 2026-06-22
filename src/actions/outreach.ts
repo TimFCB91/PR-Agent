@@ -9,6 +9,11 @@ import { outreachSchema } from "@/lib/validations";
 import { fieldErrorsFromZod, type FormState } from "@/lib/form";
 import { runPitchAgent } from "@/lib/ai/agents/pitchAgent";
 import { runFollowUpAgent } from "@/lib/ai/agents/followUpAgent";
+import {
+  buildClientEvidence,
+  getRuleSetForType,
+  runAndStoreQuality,
+} from "@/lib/quality/reportStore";
 
 // Make sure both the campaign and the media contact belong to the tenant
 // before an outreach links them together.
@@ -128,7 +133,7 @@ export async function generatePitchAction(formData: FormData): Promise<void> {
   const outreach = await prisma.outreach.findFirst({
     where: { id, organizationId: tenant.organizationId },
     include: {
-      campaign: { select: { client: { select: { name: true } } } },
+      campaign: { select: { client: { select: { id: true, name: true } } } },
       mediaContact: { select: { firstName: true, outlet: true } },
     },
   });
@@ -169,6 +174,28 @@ export async function generatePitchAction(formData: FormData): Promise<void> {
       followUpEmail: followUp.message,
     },
   });
+
+  // Quality review of the generated pitch + follow-up.
+  const clientId = outreach.campaign.client.id;
+  const evidence = await buildClientEvidence(clientId, tenant.organizationId);
+  await Promise.all([
+    runAndStoreQuality({
+      entityType: "PITCH",
+      entityId: id,
+      organizationId: tenant.organizationId,
+      text: pitch.pitchEmail,
+      evidence,
+      ruleSet: await getRuleSetForType(tenant.organizationId, "PITCH"),
+    }),
+    runAndStoreQuality({
+      entityType: "FOLLOW_UP",
+      entityId: id,
+      organizationId: tenant.organizationId,
+      text: followUp.message,
+      evidence,
+      ruleSet: await getRuleSetForType(tenant.organizationId, "FOLLOW_UP"),
+    }),
+  ]);
 
   revalidatePath("/dashboard/outreach");
 }

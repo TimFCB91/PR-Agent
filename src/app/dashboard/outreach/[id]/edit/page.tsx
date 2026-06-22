@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireTenant, canWrite } from "@/lib/tenant";
 import { updateOutreachAction } from "@/actions/outreach";
 import { PageHeader } from "@/components/ui";
+import { QualityPanel } from "@/components/quality-panel";
 import { OutreachForm } from "../../outreach-form";
 
 export default async function EditOutreachPage({
@@ -14,9 +15,13 @@ export default async function EditOutreachPage({
   const { id } = await params;
   const { organizationId, role } = await requireTenant();
   if (!canWrite(role)) redirect("/dashboard/outreach");
+  const writable = canWrite(role);
 
   const [outreach, campaigns, contacts] = await Promise.all([
-    prisma.outreach.findFirst({ where: { id, organizationId } }),
+    prisma.outreach.findFirst({
+      where: { id, organizationId },
+      include: { campaign: { select: { clientId: true } } },
+    }),
     prisma.campaign.findMany({
       where: { organizationId },
       orderBy: { name: "asc" },
@@ -42,6 +47,17 @@ export default async function EditOutreachPage({
         defaults={outreach}
         submitLabel="Speichern"
       />
+      <div className="mt-8 space-y-4">
+        <h2 className="text-lg font-semibold text-gray-900">Qualitätsprüfung</h2>
+        <div>
+          <p className="text-sm font-medium text-gray-700">Pitch-Mail</p>
+          <QualityPanel entityType="PITCH" entityId={outreach.id} clientId={outreach.campaign.clientId} organizationId={organizationId} writable={writable} />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-gray-700">Follow-up</p>
+          <QualityPanel entityType="FOLLOW_UP" entityId={outreach.id} clientId={outreach.campaign.clientId} organizationId={organizationId} writable={writable} />
+        </div>
+      </div>
     </div>
   );
 }

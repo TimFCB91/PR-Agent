@@ -123,6 +123,32 @@ enum KnowledgeCategory {
   OTHER
 }
 
+enum TextType {
+  PITCH
+  FOLLOW_UP
+  BRIEFING
+  ARTICLE
+  PRESS_RELEASE
+  LINKEDIN
+  OTHER
+}
+
+enum TextEntityType {
+  PITCH
+  FOLLOW_UP
+  BRIEFING
+  ARTICLE
+}
+
+enum TextQualityStatus {
+  GENERATED
+  CHECKED
+  NEEDS_REVIEW
+  REVISED
+  APPROVED
+  REJECTED
+}
+
 // ----------------------------------------------------------------------------
 // Tenancy
 // ----------------------------------------------------------------------------
@@ -150,6 +176,7 @@ model Organization {
   knowledgeNodes  KnowledgeNode[]
   knowledgeEdges  KnowledgeEdge[]
   aiUsageLogs     AIUsageLog[]
+  textQualityReports TextQualityReport[]
 }
 
 model User {
@@ -439,16 +466,43 @@ model WritingRuleSet {
   description       String?
   rules             String?
   forbiddenPhrases  String[] @default([])
+  requiredElements  String[] @default([])
   preferredStructure String?
   toneOfVoice       String?
+  textType          TextType @default(OTHER)
+  targetMediumType  String?
   minWords          Int?
   maxWords          Int?
+  allowGendering          Boolean @default(true)
+  allowAnglicisms         Boolean @default(false)
+  allowFirstPerson        Boolean @default(true)
+  allowDirectClientMention Boolean @default(true)
   organizationId    String
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId])
+}
+
+// Quality report for a generated text (pitch / follow-up / briefing / article).
+// One latest report per (entityType, entityId), upserted after each check.
+model TextQualityReport {
+  id             String            @id @default(cuid())
+  entityType     TextEntityType
+  entityId       String
+  status         TextQualityStatus @default(GENERATED)
+  score          Int               @default(0)
+  canApprove     Boolean           @default(false)
+  report         Json
+  organizationId String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([entityType, entityId])
   @@index([organizationId])
 }
 
