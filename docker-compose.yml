@@ -1,0 +1,37 @@
+# One-command local start:  docker compose up --build
+# Then open http://localhost:3000  (Login: owner@acme.test / password123)
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pr_agent
+    ports:
+      - "5432:5432"
+    volumes:
+      - pr_agent_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pr_agent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres@db:5432/pr_agent?schema=public"
+      # Fixed dev secret so no manual setup is needed (do NOT use in production).
+      AUTH_SECRET: "docker-dev-secret-please-change-0123456789abcdef"
+      AUTH_URL: "http://localhost:3000"
+      AUTH_TRUST_HOST: "true"
+      AI_MODE: "mock"
+      AI_PROVIDER: "anthropic"
+    ports:
+      - "3000:3000"
+
+volumes:
+  pr_agent_db:

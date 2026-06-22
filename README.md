@@ -379,7 +379,23 @@ Die Mandantentrennung ist an einer zentralen Stelle verankert:
   ausschließlich Daten der zugehörigen Organisation (über die Kampagne
   abgeleitet) und lässt sich jederzeit wieder deaktivieren.
 
-## Lokales Setup
+## Schnellstart mit Docker (empfohlen zum Ausprobieren)
+
+Nur **Docker** nötig – ein Befehl startet Datenbank **und** App inklusive
+Tabellen und Demo-Daten:
+
+```bash
+docker compose up --build
+```
+
+Danach im Browser **http://localhost:3000** öffnen und einloggen mit
+`owner@acme.test` / **`password123`**.
+
+Stoppen mit `Strg+C`; Daten zurücksetzen mit `docker compose down -v`.
+
+> Die KI läuft im **Mock-Modus** – kein API-Key/Internet nötig.
+
+## Lokales Setup (ohne Docker)
 
 ### Voraussetzungen
 
