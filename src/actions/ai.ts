@@ -56,7 +56,8 @@ export async function buildKnowledgeAction(formData: FormData): Promise<void> {
     const scope = { clientId, organizationId: tenant.organizationId };
     await tx.knowledgeEdge.deleteMany({ where: scope });
     await tx.knowledgeNode.deleteMany({ where: scope });
-    await tx.clientKnowledge.deleteMany({ where: scope });
+    // Keep manually created/edited knowledge; only replace auto-built entries.
+    await tx.clientKnowledge.deleteMany({ where: { ...scope, manual: false } });
 
     if (knowledge.length > 0) {
       await tx.clientKnowledge.createMany({

@@ -24,6 +24,7 @@ import { findTopicPool } from "@/lib/topics/topicPool";
 
 import {
   createRawInputAction,
+  importRawInputFileAction,
   deleteRawInputAction,
   processRawInputAction,
 } from "@/actions/raw-inputs";
@@ -66,7 +67,15 @@ import {
   matchAndCreateOutreachAction,
 } from "@/actions/ai";
 
+import {
+  createKnowledgeAction,
+  updateKnowledgeAction,
+  deleteKnowledgeAction,
+} from "@/actions/knowledge";
+
 import { RawInputForm } from "./_forms/raw-input-form";
+import { RawFileImportForm } from "./_forms/raw-file-import-form";
+import { KnowledgeForm } from "./_forms/knowledge-form";
 import { InsightForm } from "./_forms/insight-form";
 import { TopicForm } from "./_forms/topic-form";
 import { BriefingForm } from "./_forms/briefing-form";
@@ -286,13 +295,16 @@ async function RawTab({
   });
 
   const action = createRawInputAction.bind(null, clientId);
+  const fileAction = importRawInputFileAction.bind(null, clientId);
 
   return (
     <div className="space-y-4">
+      {writable && <RawFileImportForm action={fileAction} />}
+
       {writable && (
         <details>
           <summary className="cursor-pointer text-sm font-medium text-gray-700">
-            ＋ Neue Rohinformation
+            ＋ Neue Rohinformation (Text einfügen)
           </summary>
           <div className="mt-3">
             <RawInputForm action={action} />
@@ -495,15 +507,18 @@ async function KnowledgeTab({
     orderBy: { confidence: "desc" },
   });
 
+  const createAction = createKnowledgeAction.bind(null, clientId);
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">
-        Zentrales, zusammengeführtes Wissen — automatisch aus den
-        Rohinformationen aufgebaut (KI-ready, aktuell Mock).
+        Zentrales, zusammengeführtes Wissen. „Wissen aufbauen" erzeugt es
+        automatisch aus den Rohinformationen; manuell angelegte/bearbeitete
+        Einträge (Badge „manuell") bleiben dabei erhalten.
       </p>
 
       {writable && (
-        <div className="flex gap-2 mb-4">
+        <div className="flex flex-wrap gap-2 mb-2">
           <ActionButton
             action={buildKnowledgeAction}
             fields={{ clientId }}
@@ -518,8 +533,19 @@ async function KnowledgeTab({
         </div>
       )}
 
+      {writable && (
+        <details>
+          <summary className="cursor-pointer text-sm font-medium text-gray-700">
+            ＋ Wissen manuell anlegen
+          </summary>
+          <div className="mt-3 max-w-2xl">
+            <KnowledgeForm action={createAction} />
+          </div>
+        </details>
+      )}
+
       {items.length === 0 ? (
-        <EmptyState message="Noch kein Wissen aufgebaut. Lege zuerst Rohinformationen an und klicke „Wissen aufbauen“." />
+        <EmptyState message="Noch kein Wissen. Lege Rohinformationen an und klicke „Wissen aufbauen“ – oder lege oben manuell Wissen an." />
       ) : (
         <Card className="overflow-hidden">
           <table className="w-full text-sm">
@@ -529,24 +555,73 @@ async function KnowledgeTab({
                 <th className={th}>Titel</th>
                 <th className={th}>Inhalt</th>
                 <th className={th}>Konfidenz</th>
-                <th className={th}>Quellen</th>
+                <th className={th}>Quelle</th>
+                <th className={th} />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {items.map((k) => (
-                <tr key={k.id} className="hover:bg-gray-50">
-                  <td className={td}>
-                    <Badge value={k.category} />
-                  </td>
-                  <td className="px-5 py-3 font-medium text-gray-900">
-                    {k.title}
-                  </td>
-                  <td className={td}>
-                    <div className="max-w-md truncate">{k.content ?? "—"}</div>
-                  </td>
-                  <td className={td}>{k.confidence}%</td>
-                  <td className={td}>{k.sourceIds.length}</td>
-                </tr>
+                <Fragment key={k.id}>
+                  <tr className="hover:bg-gray-50">
+                    <td className={td}>
+                      <Badge value={k.category} />
+                    </td>
+                    <td className="px-5 py-3 font-medium text-gray-900">
+                      {k.title}
+                    </td>
+                    <td className={td}>
+                      <div className="max-w-md truncate">{k.content ?? "—"}</div>
+                    </td>
+                    <td className={td}>{k.confidence}%</td>
+                    <td className={td}>
+                      {k.manual ? (
+                        <span className="text-xs text-gray-700">manuell</span>
+                      ) : (
+                        <span className="text-xs text-gray-400">
+                          auto ({k.sourceIds.length})
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      {writable && (
+                        <div className="flex items-center justify-end">
+                          <DeleteButton
+                            id={k.id}
+                            action={deleteKnowledgeAction}
+                            extraFields={{ clientId }}
+                          />
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  {writable && (
+                    <tr>
+                      <td colSpan={6} className="px-5 pb-4">
+                        <details>
+                          <summary className="cursor-pointer text-sm font-medium text-gray-600">
+                            ✎ Bearbeiten
+                          </summary>
+                          <div className="mt-3 max-w-2xl">
+                            <KnowledgeForm
+                              action={updateKnowledgeAction.bind(
+                                null,
+                                clientId,
+                                k.id,
+                              )}
+                              submitLabel="Änderungen speichern"
+                              defaults={{
+                                category: k.category,
+                                title: k.title,
+                                content: k.content,
+                                confidence: k.confidence,
+                              }}
+                            />
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>

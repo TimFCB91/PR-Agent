@@ -9,9 +9,106 @@ import { rawInputSchema } from "@/lib/validations";
 import { fieldErrorsFromZod, type FormState } from "@/lib/form";
 import { processRawInput } from "@/lib/intake/intakeProcessor";
 import { ingestDocument } from "@/lib/knowledge/ingest";
+import { extractTextFromFile } from "@/lib/files/extractText";
 
 function rev(clientId: string) {
   revalidatePath(`/dashboard/clients/${clientId}`);
+}
+
+export interface RawFileImportState extends FormState {
+  fileName?: string;
+  chars?: number;
+}
+
+const RAW_SOURCE_TYPES = [
+  "NOTE",
+  "WEBSITE",
+  "TRANSCRIPT",
+  "EMAIL",
+  "BRIEFING",
+  "SOCIAL",
+  "PRESSKIT",
+  "OTHER",
+] as const;
+type RawSourceType = (typeof RAW_SOURCE_TYPES)[number];
+
+/**
+ * Create a raw input from an uploaded file (PDF / Word / text). The extracted
+ * text is stored as a ClientRawInput and ingested as a searchable document, so
+ * it feeds "Wissen aufbauen" and the knowledge sources just like pasted text.
+ */
+export async function importRawInputFileAction(
+  clientId: string,
+  _prev: RawFileImportState,
+  formData: FormData,
+): Promise<RawFileImportState> {
+  const acc = await writeAccess();
+  if (acc.errorState) return acc.errorState;
+  const { tenant } = acc;
+
+  const client = await prisma.client.findFirst({
+    where: { id: clientId, organizationId: tenant.organizationId },
+    select: { id: true },
+  });
+  if (!client) return { ok: false, error: "Kunde nicht gefunden." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Bitte eine Datei auswählen." };
+  }
+
+  const sourceTypeRaw = String(formData.get("sourceType") ?? "OTHER");
+  const sourceType: RawSourceType = (
+    RAW_SOURCE_TYPES as readonly string[]
+  ).includes(sourceTypeRaw)
+    ? (sourceTypeRaw as RawSourceType)
+    : "OTHER";
+
+  let extracted;
+  try {
+    extracted = await extractTextFromFile(file);
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Datei konnte nicht gelesen werden.",
+    };
+  }
+
+  if (!extracted.text) {
+    return {
+      ok: false,
+      error:
+        "Aus der Datei konnte kein Text gelesen werden (evtl. ein gescanntes PDF?).",
+    };
+  }
+
+  const titleBase = extracted.fileName.replace(/\.[^.]+$/, "").trim();
+  const rawInput = await prisma.clientRawInput.create({
+    data: {
+      title: titleBase || extracted.fileName,
+      sourceType,
+      rawText: extracted.text,
+      fileName: extracted.fileName,
+      status: "NEW",
+      clientId,
+      organizationId: tenant.organizationId,
+      createdById: tenant.userId,
+    },
+    select: { id: true, title: true, sourceType: true, fileName: true },
+  });
+
+  await ingestDocument({
+    organizationId: tenant.organizationId,
+    clientId,
+    rawInputId: rawInput.id,
+    title: rawInput.title,
+    sourceType: rawInput.sourceType,
+    sourceName: rawInput.fileName,
+    content: extracted.text,
+  });
+
+  rev(clientId);
+  return { ok: true, fileName: extracted.fileName, chars: extracted.text.length };
 }
 
 export async function createRawInputAction(

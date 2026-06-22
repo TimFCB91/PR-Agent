@@ -657,6 +657,8 @@ model ClientKnowledge {
   title          String
   content        String?
   confidence     Int               @default(50) // 0-100
+  // Manually created/edited entries are protected from the auto-rebuild.
+  manual         Boolean           @default(false)
   sourceIds      String[]          @default([])
   clientId       String
   organizationId String

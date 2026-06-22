@@ -44,6 +44,11 @@ Briefings und Artikelentwürfe bis zu Outreach, Veröffentlichungen und Reportin
   starkes Thema für mehrere Kunden zu nutzen. Rein keyword-/wissensbasiert –
   nur reale Überschneidungen, keine erfundenen Bezüge
   (`lib/matching/topicClientMatcher.ts`).
+- **Wissens-Eingabe auf drei Wegen**: Text **einfügen**, **Datei hochladen**
+  (PDF / Word .docx / .txt/.md/.csv – Text wird serverseitig ausgelesen und als
+  Rohinformation + Wissensquelle gespeichert) und **Wissen manuell anlegen/
+  bearbeiten**. Manuelle Einträge tragen das Badge „manuell" und werden vom
+  automatischen „Wissen aufbauen" nicht überschrieben (`ClientKnowledge.manual`).
 - **Themenpool mit Trello-Import**: Eigener Bereich „Themenpool" – ein Trello-
   Board als **JSON** hochladen, jede offene Karte wird zu einem Pool-Thema.
   Je Pool-Thema werden die best-passenden Kunden angezeigt; umgekehrt hat jeder

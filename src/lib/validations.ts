@@ -202,6 +202,36 @@ export const insightSchema = z.object({
   status: z.enum(["DRAFT", "APPROVED", "REJECTED"]),
 });
 
+// ClientKnowledge (manual entries) -------------------------------------------
+
+export const knowledgeSchema = z.object({
+  category: z.enum([
+    "POSITIONING",
+    "EXPERTISE",
+    "TARGET_GROUP",
+    "PROOF_POINT",
+    "QUOTE",
+    "REFERENCE",
+    "TOPIC_FIELD",
+    "MEDIA_ANGLE",
+    "NO_GO",
+    "RISK",
+    "FAQ",
+    "COMPETITOR",
+    "OTHER",
+  ]),
+  title: z.string().trim().min(1, "Titel erforderlich."),
+  content: optionalString,
+  confidence: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v === "" || v === undefined ? 50 : Number(v)))
+    .refine((v) => Number.isInteger(v) && v >= 0 && v <= 100, {
+      message: "Wert zwischen 0 und 100.",
+    }),
+});
+
 // TopicIdea (3) ---------------------------------------------------------------
 
 export const topicSchema = z.object({
