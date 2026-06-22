@@ -77,6 +77,16 @@ export default async function SettingsPage() {
           </LinkButton>
         </div>
       </Card>
+
+      <Card className="mt-6 p-6">
+        <h2 className="text-sm font-semibold text-gray-900">AI</h2>
+        <p className="mt-1 text-sm text-gray-500">KI-Modus und Nutzungs-Log</p>
+        <div className="mt-4">
+          <LinkButton href="/dashboard/settings/ai">
+            AI-Status & Nutzung
+          </LinkButton>
+        </div>
+      </Card>
     </div>
   );
 }

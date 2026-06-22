@@ -44,6 +44,13 @@ import {
   createPublicationAction,
   deletePublicationAction,
 } from "@/actions/publications";
+import {
+  buildKnowledgeAction,
+  generateTopicsFromKnowledgeAction,
+  buildBriefingViaAgentAction,
+  buildArticleViaAgentAction,
+  matchAndCreateOutreachAction,
+} from "@/actions/ai";
 
 import { RawInputForm } from "./_forms/raw-input-form";
 import { InsightForm } from "./_forms/insight-form";
@@ -56,6 +63,8 @@ const TABS = [
   { key: "overview", label: "Übersicht" },
   { key: "raw", label: "Rohinformationen" },
   { key: "insights", label: "Erkenntnisse" },
+  { key: "knowledge", label: "Wissen" },
+  { key: "graph", label: "Wissensgraph" },
   { key: "topics", label: "Themen" },
   { key: "contacts", label: "Medienkontakte" },
   { key: "outreach", label: "Outreach" },
@@ -138,6 +147,16 @@ export default async function ClientDetailPage({
           organizationId={organizationId}
           writable={writable}
         />
+      )}
+      {activeTab === "knowledge" && (
+        <KnowledgeTab
+          clientId={id}
+          organizationId={organizationId}
+          writable={writable}
+        />
+      )}
+      {activeTab === "graph" && (
+        <GraphTab clientId={id} organizationId={organizationId} />
       )}
       {activeTab === "topics" && (
         <TopicsTab
@@ -414,6 +433,169 @@ async function InsightsTab({
 
 // ---------------------------------------------------------------------------
 
+async function KnowledgeTab({
+  clientId,
+  organizationId,
+  writable,
+}: {
+  clientId: string;
+  organizationId: string;
+  writable: boolean;
+}) {
+  const items = await prisma.clientKnowledge.findMany({
+    where: { clientId, organizationId },
+    orderBy: { confidence: "desc" },
+  });
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500">
+        Zentrales, zusammengeführtes Wissen — automatisch aus den
+        Rohinformationen aufgebaut (KI-ready, aktuell Mock).
+      </p>
+
+      {writable && (
+        <div className="flex gap-2 mb-4">
+          <ActionButton
+            action={buildKnowledgeAction}
+            fields={{ clientId }}
+            label="Wissen aufbauen"
+            variant="primary"
+          />
+          <ActionButton
+            action={generateTopicsFromKnowledgeAction}
+            fields={{ clientId }}
+            label="Themen aus Wissen generieren"
+          />
+        </div>
+      )}
+
+      {items.length === 0 ? (
+        <EmptyState message="Noch kein Wissen aufgebaut. Lege zuerst Rohinformationen an und klicke „Wissen aufbauen“." />
+      ) : (
+        <Card className="overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="border-b border-gray-200 bg-gray-50 text-left">
+              <tr>
+                <th className={th}>Kategorie</th>
+                <th className={th}>Titel</th>
+                <th className={th}>Inhalt</th>
+                <th className={th}>Konfidenz</th>
+                <th className={th}>Quellen</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {items.map((k) => (
+                <tr key={k.id} className="hover:bg-gray-50">
+                  <td className={td}>
+                    <Badge value={k.category} />
+                  </td>
+                  <td className="px-5 py-3 font-medium text-gray-900">
+                    {k.title}
+                  </td>
+                  <td className={td}>
+                    <div className="max-w-md truncate">{k.content ?? "—"}</div>
+                  </td>
+                  <td className={td}>{k.confidence}%</td>
+                  <td className={td}>{k.sourceIds.length}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+async function GraphTab({
+  clientId,
+  organizationId,
+}: {
+  clientId: string;
+  organizationId: string;
+}) {
+  const [nodes, edges] = await Promise.all([
+    prisma.knowledgeNode.findMany({
+      where: { clientId, organizationId },
+    }),
+    prisma.knowledgeEdge.findMany({
+      where: { clientId, organizationId },
+    }),
+  ]);
+
+  const labelById = new Map<string, string>(
+    nodes.map((n) => [n.id, n.label]),
+  );
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500">
+        Wissensgraph (vorbereitet): Knoten und Verbindungen, die zusammengehörige
+        Informationen verknüpfen.
+      </p>
+
+      {nodes.length === 0 ? (
+        <EmptyState message="Noch keine Knoten. Baue zuerst das Wissen auf." />
+      ) : (
+        <>
+          <Card className="overflow-hidden">
+            <div className="border-b border-gray-200 bg-gray-50 px-5 py-3 text-sm font-medium text-gray-900">
+              Knoten
+            </div>
+            <table className="w-full text-sm">
+              <thead className="border-b border-gray-200 bg-gray-50 text-left">
+                <tr>
+                  <th className={th}>Typ</th>
+                  <th className={th}>Label</th>
+                  <th className={th}>Beschreibung</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {nodes.map((n) => (
+                  <tr key={n.id} className="hover:bg-gray-50">
+                    <td className={td}>
+                      <Badge value={n.type} />
+                    </td>
+                    <td className="px-5 py-3 font-medium text-gray-900">
+                      {n.label}
+                    </td>
+                    <td className={td}>{n.description ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          <Card className="overflow-hidden">
+            <div className="border-b border-gray-200 bg-gray-50 px-5 py-3 text-sm font-medium text-gray-900">
+              Verbindungen
+            </div>
+            {edges.length === 0 ? (
+              <div className="px-5 py-3 text-sm text-gray-500">
+                Keine Verbindungen.
+              </div>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {edges.map((e) => (
+                  <li key={e.id} className="px-5 py-3 text-sm text-gray-600">
+                    {labelById.get(e.fromNodeId) ?? e.fromNodeId} → [{e.relation}]{" "}
+                    → {labelById.get(e.toNodeId) ?? e.toNodeId}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
 async function TopicsTab({
   clientId,
   organizationId,
@@ -494,6 +676,16 @@ async function TopicsTab({
                           action={buildBriefingFromTopicAction}
                           fields={{ id: it.id, clientId }}
                           label="Briefing erstellen"
+                        />
+                        <ActionButton
+                          action={buildBriefingViaAgentAction}
+                          fields={{ id: it.id, clientId }}
+                          label="KI-Briefing"
+                        />
+                        <ActionButton
+                          action={matchAndCreateOutreachAction}
+                          fields={{ id: it.id, clientId }}
+                          label="Medien-Matching"
                         />
                         <DeleteButton
                           id={it.id}
@@ -707,6 +899,11 @@ async function BriefingsTab({
                           action={buildArticleFromBriefingAction}
                           fields={{ id: it.id, clientId }}
                           label="Artikel erstellen"
+                        />
+                        <ActionButton
+                          action={buildArticleViaAgentAction}
+                          fields={{ id: it.id, clientId }}
+                          label="KI-Artikel"
                         />
                         <DeleteButton
                           id={it.id}

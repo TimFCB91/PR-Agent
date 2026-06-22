@@ -7,10 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { requireWriteAccess, AccessDeniedError } from "@/lib/tenant";
 import { outreachSchema } from "@/lib/validations";
 import { fieldErrorsFromZod, type FormState } from "@/lib/form";
-import {
-  generatePitchEmail,
-  generateFollowUpEmail,
-} from "@/lib/outreach/outreachManager";
+import { runPitchAgent } from "@/lib/ai/agents/pitchAgent";
+import { runFollowUpAgent } from "@/lib/ai/agents/followUpAgent";
 
 // Make sure both the campaign and the media contact belong to the tenant
 // before an outreach links them together.
@@ -136,18 +134,39 @@ export async function generatePitchAction(formData: FormData): Promise<void> {
   });
   if (!outreach) return;
 
-  const ctx = {
-    contactFirstName: outreach.mediaContact.firstName,
-    contactOutlet: outreach.mediaContact.outlet,
-    clientName: outreach.campaign.client.name,
-    topicTitle: outreach.agreedTopic ?? outreach.subject,
+  const agentCtx = {
+    organizationId: tenant.organizationId,
+    userId: tenant.userId,
   };
+  const clientName = outreach.campaign.client.name;
+  const topicTitle = outreach.agreedTopic ?? outreach.subject;
+
+  const [pitch, followUp] = await Promise.all([
+    runPitchAgent(
+      {
+        clientName,
+        topicTitle,
+        contactFirstName: outreach.mediaContact.firstName,
+        contactOutlet: outreach.mediaContact.outlet,
+      },
+      agentCtx,
+    ),
+    runFollowUpAgent(
+      {
+        variant: "THREE_DAYS",
+        clientName,
+        topicTitle,
+        contactFirstName: outreach.mediaContact.firstName,
+      },
+      agentCtx,
+    ),
+  ]);
 
   await prisma.outreach.updateMany({
     where: { id, organizationId: tenant.organizationId },
     data: {
-      pitchEmail: generatePitchEmail(ctx),
-      followUpEmail: generateFollowUpEmail(ctx),
+      pitchEmail: pitch.pitchEmail,
+      followUpEmail: followUp.message,
     },
   });
 

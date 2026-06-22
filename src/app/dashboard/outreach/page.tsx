@@ -5,6 +5,7 @@ import { requireTenant, canWrite } from "@/lib/tenant";
 import { deleteOutreachAction, generatePitchAction } from "@/actions/outreach";
 import { DeleteButton } from "@/components/delete-button";
 import { ActionButton } from "@/components/action-button";
+import { FollowUpControl } from "./follow-up-control";
 import {
   Card,
   PageHeader,
@@ -84,6 +85,7 @@ export default async function OutreachPage() {
                           fields={{ id: o.id }}
                           label="Pitch generieren"
                         />
+                        <FollowUpControl outreachId={o.id} />
                         <Link
                           href={`/dashboard/outreach/${o.id}/edit`}
                           className="text-xs font-medium text-gray-700 underline"

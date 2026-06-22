@@ -298,6 +298,71 @@ async function main() {
     },
   });
 
+  // ---- Knowledge layer + graph demo (built from raw inputs) ----
+  const acmeTopicNode = await prisma.knowledgeNode.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      type: "TOPIC_FIELD",
+      label: "E-Mobilität in Städten",
+      description: "Themenfeld rund um nachhaltige urbane Mobilität.",
+    },
+  });
+  const acmeExpNode = await prisma.knowledgeNode.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      type: "EXPERTISE",
+      label: "15+ Jahre Erfahrung",
+      description: "Langjährige Expertise im E-Bike-Bereich.",
+    },
+  });
+  await prisma.knowledgeEdge.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      relation: "supports",
+      fromNodeId: acmeExpNode.id,
+      toNodeId: acmeTopicNode.id,
+    },
+  });
+
+  await prisma.clientKnowledge.createMany({
+    data: [
+      {
+        organizationId: acme.id,
+        clientId: acmeClientA.id,
+        category: "EXPERTISE",
+        title: "15+ Jahre Erfahrung in E-Mobilität",
+        content: "Langjährige Expertise als Aufhänger für Fachbeiträge.",
+        confidence: 70,
+        sourceIds: [acmeRaw.id],
+      },
+      {
+        organizationId: acme.id,
+        clientId: acmeClientA.id,
+        category: "TOPIC_FIELD",
+        title: "E-Mobilität in Städten",
+        content: "Trend-Thema mit hohem Suchpotenzial.",
+        confidence: 65,
+        sourceIds: [acmeRaw.id],
+      },
+    ],
+  });
+
+  await prisma.aIUsageLog.create({
+    data: {
+      organizationId: acme.id,
+      userId: acmeOwner.id,
+      agent: "topicAgent",
+      provider: "mock",
+      mode: "mock",
+      model: "mock-1",
+      latencyMs: 3,
+      success: true,
+    },
+  });
+
   // --------------------------------------------------------------------------
   // Organization 2 — Globe Comms (fictional, isolated tenant)
   // --------------------------------------------------------------------------

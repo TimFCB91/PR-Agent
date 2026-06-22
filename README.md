@@ -81,6 +81,10 @@ Rohinformation  →  Erkenntnis  →  Themenidee  →  Briefing  →  Artikelent
 | `ArticleDraft`   | Artikelentwurf                                      | `organizationId` |
 | `Publication`    | Veröffentlichung (platzierte Berichterstattung)     | `organizationId` |
 | `WritingRuleSet` | Schreibregeln für die spätere Artikel-Erstellung    | `organizationId` |
+| `ClientKnowledge`| Zentrales, zusammengeführtes Kundenwissen           | `organizationId` |
+| `KnowledgeNode`  | Knoten im Wissensgraph                               | `organizationId` |
+| `KnowledgeEdge`  | Verbindung im Wissensgraph                           | `organizationId` |
+| `AIUsageLog`     | Protokoll aller KI-Agenten-Aufrufe                  | `organizationId` |
 
 Alle tenant-bezogenen Modelle besitzen eine `organizationId`.
 
@@ -98,6 +102,79 @@ können:
 | `lib/briefings/briefingManager.ts`      | Thema → Briefing                          |
 | `lib/articles/articleBuilder.ts`        | Briefing (+ Regeln) → Artikelentwurf      |
 | `lib/articles/articleQualityChecker.ts` | Artikel gegen Schreibregeln prüfen        |
+
+## KI-gestütztes Knowledge- & Agentensystem
+
+Auf der Workflow-Basis sitzt ein **KI-Layer**. Er ist **Mock-by-default**: ohne
+`AI_MODE=real` werden keine externen Dienste aufgerufen – die Agenten liefern
+deterministische Mock-Ergebnisse über die obigen Services. Per Umgebungsvariable
+lässt sich auf echte Anbieter (OpenAI, Anthropic, lokale Modelle) umschalten,
+ohne Agenten- oder UI-Code zu ändern.
+
+### Knowledge Layer & Graph
+
+- **`ClientKnowledge`** – zentrales, zusammengeführtes Wissen je Kunde
+  (Kategorie, Titel, Inhalt, Konfidenz, `sourceIds`). Wird über
+  „Wissen aufbauen" (Tab **Wissen**) aus allen Rohinformationen erzeugt.
+- **`KnowledgeNode` / `KnowledgeEdge`** – vorbereiteter **Wissensgraph**, der
+  zusammengehörige Informationen verknüpft (z. B. *Expertise* → `supports` →
+  *Themenfeld*). Sichtbar im Tab **Wissensgraph**.
+- Service: `lib/ai/knowledge/knowledgeBuilder.ts` (Mock, KI-ready).
+
+### AI Provider Layer (`lib/ai/`)
+
+Anbieterunabhängige Schnittstelle – Agenten kennen **nur** das Interface, nie
+einen konkreten Anbieter:
+
+| Datei                          | Aufgabe                                            |
+| ------------------------------ | -------------------------------------------------- |
+| `lib/ai/types.ts`              | `AIProvider`-Interface, Request/Result-Typen       |
+| `lib/ai/config.ts`            | Liest `AI_MODE` / `AI_PROVIDER` / `AI_MODEL` (env)  |
+| `lib/ai/provider.ts`          | Factory: Konfiguration → konkreter Provider         |
+| `lib/ai/providers/mock.ts`    | Mock-Provider (Standard)                             |
+| `lib/ai/providers/anthropic.ts` | Anthropic / Claude (`claude-opus-4-8`)            |
+| `lib/ai/providers/openai.ts`  | OpenAI **und** lokale OpenAI-kompatible Endpunkte    |
+| `lib/ai/prompts.ts`           | **Zentrale Prompt-Logik** (alle Agenten)            |
+
+Die **Prompt-Logik liegt ausschließlich** in `lib/ai/prompts.ts` – bewusst als
+strukturelle Builder (Rolle + Aufgabe + striktes JSON-Output-Format), nicht als
+fertige, ausformulierte Prompts. Agenten enthalten keine Prompt-Strings.
+
+### Agenten (`lib/ai/agents/`)
+
+Jeder Agent hat **definierten Input/Output mit Zod-Validierung**, baut seinen
+Prompt zentral und besitzt eine deterministische Mock-Implementierung. Der
+gemeinsame Runner (`runAgent.ts`) übernimmt Mock/Real-Umschaltung, JSON-Parsing,
+Output-Validierung, Fallback und **Usage-Logging**.
+
+| Agent                  | Input → Output                                              |
+| ---------------------- | ---------------------------------------------------------- |
+| `topicAgent`           | Kundenwissen → Themen (Relevanz, Zielmedium, Winkel, …)    |
+| `mediaMatchingAgent`   | Thema + Profil + Kontakte → Match-Score, Begründung, Winkel |
+| `pitchAgent`           | Kontext → Betreff, Pitch-Mail, Begründung                  |
+| `followUpAgent`        | Variante (3 Tage / 7 Tage / Zusage / Absage) → Follow-up   |
+| `briefingAgent`        | Thema + Wissen → Titel, Kernaussagen, Struktur, No-Gos     |
+| `articleAgent`         | Briefing + Schreibregeln → Titel, Untertitel, Artikel, Meta |
+
+### Mock- vs. Real-Modus
+
+```bash
+AI_MODE="mock"            # Standard – keine externen Aufrufe
+# oder:
+AI_MODE="real"
+AI_PROVIDER="anthropic"   # anthropic | openai | local
+ANTHROPIC_API_KEY="sk-ant-..."
+# AI_MODEL="claude-opus-4-8"   # optionaler Override
+```
+
+Für lokale Modelle (Ollama, vLLM, LM Studio): `AI_PROVIDER=local` +
+`AI_LOCAL_BASE_URL`. Siehe `.env.example`.
+
+### AI Usage Logging
+
+Jeder Agenten-Aufruf wird in **`AIUsageLog`** protokolliert (Agent, Provider,
+Modus, Modell, Tokens, Dauer, Erfolg, Nutzer) – tenant-isoliert. Einsehbar unter
+**Einstellungen → AI**.
 
 ## Sicherheitskonzept
 
@@ -221,6 +298,7 @@ src/
     csv.ts             # CSV-Parser + -Export
     reporting.ts       # Kampagnen-Kennzahlen (Dashboard + Report)
     intake/ topics/ outreach/ briefings/ articles/   # Mock-Services (KI-ready)
+    ai/                # AI-Layer: provider/, agents/, prompts.ts, knowledge/
   actions/             # Server Actions (CRUD, Auth, Import, Workflow)
   components/           # UI-Bausteine (ui, delete-button, action-button, sidebar)
   app/
@@ -246,12 +324,18 @@ src/
 | `npm run db:seed`   | Demo-Daten einspielen              |
 | `npm run db:reset`  | DB zurücksetzen + neu seeden       |
 
+## KI-Status
+
+- **Provider-, Agenten- und Knowledge-Architektur sind vollständig vorhanden**
+  und über `AI_MODE` zwischen **Mock** und **Real** umschaltbar.
+- **Standard ist Mock** – ohne API-Key/`AI_MODE=real` werden keine externen
+  KI-Dienste aufgerufen. So bleibt das System ohne Kosten lauffähig und testbar.
+- Real-Modus unterstützt **OpenAI**, **Anthropic** und **lokale Modelle** über
+  dieselbe Schnittstelle.
+
 ## Bewusst (noch) nicht enthalten
 
-- **Keine echte KI** – die Workflow-Schritte laufen über Mock-Services, die
-  als klare Erweiterungspunkte für spätere KI-Aufrufe dienen.
-- **Keine autonomen Agenten.**
 - **Keine Stripe-/Billing-Integration.**
 
-Fokus: stabiles Datenmodell, sauberer Workflow und Skalierbarkeit. Erweiterungen
-(insbesondere KI) bauen auf dieser Basis auf.
+Fokus: stabiles Datenmodell, sauberer Workflow, klare KI-Architektur und
+Skalierbarkeit.

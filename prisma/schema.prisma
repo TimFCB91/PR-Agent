@@ -107,6 +107,22 @@ enum ArticleStatus {
   ARCHIVED
 }
 
+enum KnowledgeCategory {
+  POSITIONING
+  EXPERTISE
+  TARGET_GROUP
+  PROOF_POINT
+  QUOTE
+  REFERENCE
+  TOPIC_FIELD
+  MEDIA_ANGLE
+  NO_GO
+  RISK
+  FAQ
+  COMPETITOR
+  OTHER
+}
+
 // ----------------------------------------------------------------------------
 // Tenancy
 // ----------------------------------------------------------------------------
@@ -130,6 +146,10 @@ model Organization {
   articleDrafts  ArticleDraft[]
   publications   Publication[]
   writingRuleSets WritingRuleSet[]
+  knowledge       ClientKnowledge[]
+  knowledgeNodes  KnowledgeNode[]
+  knowledgeEdges  KnowledgeEdge[]
+  aiUsageLogs     AIUsageLog[]
 }
 
 model User {
@@ -144,6 +164,7 @@ model User {
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   rawInputs    ClientRawInput[]
+  aiUsageLogs  AIUsageLog[]
 
   @@index([organizationId])
 }
@@ -171,6 +192,9 @@ model Client {
   briefings     Briefing[]
   articleDrafts ArticleDraft[]
   publications  Publication[]
+  knowledge      ClientKnowledge[]
+  knowledgeNodes KnowledgeNode[]
+  knowledgeEdges KnowledgeEdge[]
 
   @@index([organizationId])
 }
@@ -426,4 +450,95 @@ model WritingRuleSet {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
+}
+
+// ----------------------------------------------------------------------------
+// Knowledge layer & graph (KI-gestützt)
+// ----------------------------------------------------------------------------
+
+// Central, consolidated knowledge about a client — built (later via AI) by
+// merging information across multiple raw inputs. `sourceIds` references the
+// ClientRawInput records the entry was derived from.
+model ClientKnowledge {
+  id             String            @id @default(cuid())
+  category       KnowledgeCategory
+  title          String
+  content        String?
+  confidence     Int               @default(50) // 0-100
+  sourceIds      String[]          @default([])
+  clientId       String
+  organizationId String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([clientId])
+}
+
+// Knowledge graph (prepared): nodes (concepts) and edges (relations) so the
+// system can later merge information into connected insights.
+model KnowledgeNode {
+  id             String   @id @default(cuid())
+  type           String // e.g. "topicField", "expertise", "mediaAngle"
+  label          String
+  description    String?
+  clientId       String
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  outgoing     KnowledgeEdge[] @relation("EdgeFrom")
+  incoming     KnowledgeEdge[] @relation("EdgeTo")
+
+  @@index([organizationId])
+  @@index([clientId])
+}
+
+model KnowledgeEdge {
+  id             String   @id @default(cuid())
+  relation       String // e.g. "supports", "relatesTo", "derivedFrom"
+  fromNodeId     String
+  toNodeId       String
+  clientId       String
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  fromNode     KnowledgeNode @relation("EdgeFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNode       KnowledgeNode @relation("EdgeTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([clientId])
+}
+
+// ----------------------------------------------------------------------------
+// AI usage logging
+// ----------------------------------------------------------------------------
+
+model AIUsageLog {
+  id             String   @id @default(cuid())
+  agent          String // agent name, e.g. "topicAgent"
+  provider       String // "mock" | "anthropic" | "openai" | "local"
+  mode           String // "mock" | "real"
+  model          String?
+  inputTokens    Int?
+  outputTokens   Int?
+  latencyMs      Int?
+  success        Boolean  @default(true)
+  error          String?
+  userId         String?
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([createdAt])
 }
