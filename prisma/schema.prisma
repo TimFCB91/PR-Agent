@@ -36,6 +36,16 @@ enum Level {
 }
 
 // Extended outreach lifecycle covering the full pitch-to-publish process.
+enum ResponseType {
+  NO_RESPONSE
+  INTERESTED
+  ACCEPTED
+  DECLINED
+  NEEDS_MORE_INFO
+  OUT_OF_OFFICE
+  WRONG_CONTACT
+}
+
 enum OutreachStatus {
   DRAFT
   READY
@@ -262,6 +272,15 @@ model MediaContact {
   outlet         String?
   beat           String?
   notes          String?
+  // Media intelligence — learned from real outreach/publication history.
+  replyRate             Float?
+  acceptanceRate        Float?
+  publicationRate       Float?
+  averageResponseTime   Float?   // hours
+  lastSuccessfulTopic   String?
+  preferredAngles       String[] @default([])
+  avoidedTopics         String[] @default([])
+  notesFromInteractions String?
   organizationId String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -288,6 +307,13 @@ model Outreach {
   agreedTopic       String?
   publicationUrl    String?
   internalNotes     String?
+  // Media intelligence — captured response signals.
+  responseReceivedAt DateTime?
+  responseType       ResponseType?
+  responseSummary    String?
+  rejectionReason    String?
+  acceptedAngle      String?
+  followUpCount      Int          @default(0)
   campaignId     String
   mediaContactId String
   organizationId String
@@ -297,6 +323,7 @@ model Outreach {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   mediaContact MediaContact @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
+  sourcedPublications Publication[] @relation("PublicationSource")
 
   @@index([organizationId])
   @@index([campaignId])
@@ -442,6 +469,11 @@ model Publication {
   url             String?
   publicationDate DateTime?
   notes           String?
+  // Media intelligence — what worked and where it came from.
+  resultingTopic   String?
+  resultingAngle   String?
+  sourceOutreachId String?
+  performanceNotes String?
   clientId        String
   campaignId      String?
   mediaContactId  String?
@@ -449,10 +481,11 @@ model Publication {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  campaign     Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  mediaContact MediaContact? @relation(fields: [mediaContactId], references: [id], onDelete: SetNull)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client         Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign       Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  mediaContact   MediaContact? @relation(fields: [mediaContactId], references: [id], onDelete: SetNull)
+  sourceOutreach Outreach?     @relation("PublicationSource", fields: [sourceOutreachId], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
   @@index([clientId])
