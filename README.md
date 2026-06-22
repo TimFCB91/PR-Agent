@@ -89,6 +89,9 @@ Rohinformation  →  Erkenntnis  →  Themenidee  →  Briefing  →  Artikelent
 | `KnowledgeDocument` | Durchsuchbares Dokument (aus RawInput/Upload)       | `organizationId` |
 | `KnowledgeChunk`    | Abrufbares Textstück eines Dokuments (Retrieval)    | `organizationId` |
 | `KnowledgeSourceRef`| Vom Agenten genutzte Quelle je Output (Nachweis)    | `organizationId` |
+| `MediaPerformance`  | Aggregierte Kennzahlen je Medienkontakt             | `organizationId` |
+| `MediaInteraction`  | Geloggte Interaktion (Lernsignal)                   | `organizationId` |
+| `JournalistPreference` | Abgeleitete Vorlieben je Journalist:in           | `organizationId` |
 
 Alle tenant-bezogenen Modelle besitzen eine `organizationId`.
 
@@ -216,6 +219,42 @@ abrufbar.
   Anzahl Chunks, Status.
 - Alle Dokumente, Chunks und Referenzen sind strikt nach `organizationId`
   getrennt.
+
+## Media Intelligence
+
+Erweitert `MediaContact`, `Outreach`, `Campaign`, `TopicIdea` und `Publication`
+(keine separate Plattform): das System **lernt aus echten Interaktionen**,
+welche Medien, Journalist:innen, Themen und Winkel funktionieren.
+
+- **Modelle**: `MediaInteraction` (geloggte Signale: pitch/follow_up/response/
+  publication mit Ergebnis), `MediaPerformance` (aggregierte Kennzahlen je
+  Kontakt) und `JournalistPreference` (automatisch abgeleitete Vorlieben).
+  Zusätzliche Felder auf `Outreach` (responseType, responseReceivedAt,
+  rejectionReason, acceptedAngle, followUpCount, publicationCreated …) und
+  `Publication` (resultingTopic, resultingAngle, sourceOutreachId,
+  performanceNotes).
+- **`lib/media/mediaPerformanceCalculator.ts`** (rein): Reply-/Acceptance-/
+  Publication-Rate, Ø Antwortzeit, Erfolgsquote pro Thema und pro Winkel.
+- **`lib/media/mediaIntelligence.ts`**: protokolliert Interaktionen, berechnet
+  Performance + Preferences neu (`recompute…`), erkennt Muster und liefert eine
+  **Media Intelligence Summary** (z. B. „Winkel ‚Servicenutzen' funktioniert
+  besonders gut"). Architektur ist für spätere Empfehlungs-KI vorbereitet
+  (noch keine echte Vorhersage-KI).
+- **Erfassung**: Beim Speichern einer Outreach-Reaktion (Formular) wird eine
+  `MediaInteraction` geloggt und die Performance des Kontakts neu berechnet.
+- **Agenten-Integration**:
+  - *Topic Agent* nutzt historische Ergebnisse – ähnliche erfolgreiche Themen
+    erhöhen die Priorität, häufige Misserfolge erzeugen einen Warnhinweis.
+  - *Media Matching Agent* bewertet zusätzlich zur fachlichen Passung den
+    **Historical Success Score** (vergangene Zusagen/Veröffentlichungen,
+    erfolgreiche Winkel) und meidet abgelehnte Themen.
+  - *Pitch Agent* gibt **empfohlenen Winkel** und **Erfolgswahrscheinlichkeit**
+    auf Basis der Kontakt-Historie zurück.
+- **In bestehenden Seiten** sichtbar: Campaign Dashboard (Reply-/Acceptance-/
+  Publication-Rate, Top-Medien/-Themen/-Winkel, häufigste Ablehnungsgründe),
+  MediaContact-Detailseite (Quoten, letzte Kontakte, Veröffentlichungen,
+  bevorzugte Themen/Formate) und der Campaign Report (auch extern).
+- Alle Media-Intelligence-Daten sind strikt nach `organizationId` getrennt.
 
 ## Schreibregel-, Qualitäts- & Faktencheck-Engine
 
@@ -404,6 +443,7 @@ src/
     writing/           # Schreibregel-Engine (rules, analyzer, rewrite, …)
     quality/           # Fact-/Claim-/AI-Pattern-/Editorial-Checks + Report-Store
     knowledge/         # Knowledge Retrieval (chunker, retriever, embeddings, ingest, sources)
+    media/             # Media Intelligence (performanceCalculator, mediaIntelligence)
   actions/             # Server Actions (CRUD, Auth, Import, Workflow)
   components/           # UI-Bausteine (ui, delete-button, action-button, sidebar)
   app/

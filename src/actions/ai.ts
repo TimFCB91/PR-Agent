@@ -17,6 +17,10 @@ import {
   runAndStoreQuality,
 } from "@/lib/quality/reportStore";
 import { gatherKnowledge, saveSourceRefs } from "@/lib/knowledge/sources";
+import {
+  getAllTopicOutcomes,
+  getContactStatsForMatching,
+} from "@/lib/media/mediaIntelligence";
 
 function revClient(clientId: string) {
   revalidatePath(`/dashboard/clients/${clientId}`);
@@ -114,8 +118,9 @@ export async function generateTopicsFromKnowledgeAction(
     `${client.name} Themen Positionierung Expertise`,
   );
 
+  const history = await getAllTopicOutcomes(tenant.organizationId);
   const result = await runTopicAgent(
-    { clientName: client.name, knowledge, sources: gathered.chunks },
+    { clientName: client.name, knowledge, sources: gathered.chunks, history },
     { organizationId: tenant.organizationId, userId: tenant.userId },
   );
 
@@ -347,10 +352,8 @@ export async function matchAndCreateOutreachAction(
   });
   if (!topic || !topic.campaignId) return;
 
-  const contacts = await prisma.mediaContact.findMany({
-    where: { organizationId: tenant.organizationId },
-    select: { id: true, firstName: true, lastName: true, outlet: true, beat: true },
-  });
+  // Media intelligence: contacts with their historical performance stats.
+  const contacts = await getContactStatsForMatching(tenant.organizationId);
   if (contacts.length === 0) return;
 
   const gathered = await gatherKnowledge(
@@ -370,9 +373,15 @@ export async function matchAndCreateOutreachAction(
       clientProfile: topic.client.notes ?? topic.client.name,
       mediaContacts: contacts.map((c) => ({
         id: c.id,
-        name: `${c.firstName} ${c.lastName}`,
+        name: c.name,
         outlet: c.outlet,
         beat: c.beat,
+        replyRate: c.replyRate,
+        acceptanceRate: c.acceptanceRate,
+        publicationRate: c.publicationRate,
+        preferredAngles: c.preferredAngles,
+        avoidedTopics: c.avoidedTopics,
+        lastSuccessfulTopic: c.lastSuccessfulTopic,
       })),
       sources: gathered.chunks,
     },
@@ -396,7 +405,7 @@ export async function matchAndCreateOutreachAction(
         subject: topic.title,
         status: "DRAFT",
         agreedTopic: topic.title,
-        internalNotes: `Match-Score ${match.matchScore}: ${match.reason}\nVorgeschlagener Winkel: ${match.suggestedAngle}`,
+        internalNotes: `Match-Score ${match.matchScore} · Historie ${match.historicalSuccessScore}: ${match.reason}\nVorgeschlagener Winkel: ${match.suggestedAngle}`,
       },
     });
   }

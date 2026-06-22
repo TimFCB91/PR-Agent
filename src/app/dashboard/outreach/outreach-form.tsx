@@ -49,7 +49,23 @@ export interface OutreachFormValues {
   agreedTopic?: string | null;
   publicationUrl?: string | null;
   internalNotes?: string | null;
+  responseReceivedAt?: Date | string | null;
+  responseType?: string | null;
+  responseSummary?: string | null;
+  rejectionReason?: string | null;
+  acceptedAngle?: string | null;
+  publicationCreated?: boolean | null;
 }
+
+const RESPONSE_TYPES = [
+  "NO_RESPONSE",
+  "INTERESTED",
+  "ACCEPTED",
+  "DECLINED",
+  "NEEDS_MORE_INFO",
+  "OUT_OF_OFFICE",
+  "WRONG_CONTACT",
+] as const;
 
 export function OutreachForm({
   action,
@@ -223,6 +239,74 @@ export function OutreachForm({
             rows={3}
             defaultValue={defaults?.internalNotes ?? ""}
           />
+        </div>
+
+        {/* Media intelligence — capture the response to feed the learning loop. */}
+        <div className="rounded-md border border-gray-200 p-4">
+          <p className="mb-3 text-sm font-semibold text-gray-900">
+            Reaktion erfassen (Media Intelligence)
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="responseType">Reaktionstyp</Label>
+              <Select
+                id="responseType"
+                name="responseType"
+                defaultValue={defaults?.responseType ?? ""}
+              >
+                <option value="">— keine —</option>
+                {RESPONSE_TYPES.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="responseReceivedAt">Antwort erhalten am</Label>
+              <Input
+                id="responseReceivedAt"
+                name="responseReceivedAt"
+                type="date"
+                defaultValue={toDateInput(defaults?.responseReceivedAt)}
+              />
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="acceptedAngle">Akzeptierter Winkel</Label>
+              <Input
+                id="acceptedAngle"
+                name="acceptedAngle"
+                defaultValue={defaults?.acceptedAngle ?? ""}
+              />
+            </div>
+            <div>
+              <Label htmlFor="rejectionReason">Ablehnungsgrund</Label>
+              <Input
+                id="rejectionReason"
+                name="rejectionReason"
+                defaultValue={defaults?.rejectionReason ?? ""}
+              />
+            </div>
+          </div>
+          <div className="mt-4">
+            <Label htmlFor="responseSummary">Zusammenfassung der Reaktion</Label>
+            <Textarea
+              id="responseSummary"
+              name="responseSummary"
+              rows={2}
+              defaultValue={defaults?.responseSummary ?? ""}
+            />
+          </div>
+          <label className="mt-4 flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              name="publicationCreated"
+              defaultChecked={defaults?.publicationCreated ?? false}
+            />
+            Veröffentlichung entstanden
+          </label>
         </div>
 
         <div className="flex gap-2">

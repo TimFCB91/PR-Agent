@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
 import { getCampaignReport } from "@/lib/reporting";
+import { getCampaignMediaIntelligence } from "@/lib/media/mediaIntelligence";
 import { Card } from "@/components/ui";
 
 export const metadata = { title: "Kampagnen-Report" };
@@ -22,6 +23,10 @@ export default async function PublicReportPage({
   if (!campaign) notFound();
 
   const report = await getCampaignReport(campaign.id, campaign.organizationId);
+  const mi = await getCampaignMediaIntelligence(
+    campaign.id,
+    campaign.organizationId,
+  );
 
   const publications = await prisma.publication.findMany({
     where: { campaignId: campaign.id, organizationId: campaign.organizationId },
@@ -60,6 +65,78 @@ export default async function PublicReportPage({
             </p>
           </Card>
         ))}
+      </div>
+
+      <h2 className="mt-8 mb-3 text-lg font-semibold text-gray-900">
+        Media Intelligence
+      </h2>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {[
+          { label: "Kontaktiert", value: mi.contacted },
+          { label: "Geantwortet", value: mi.responded },
+          { label: "Zugesagt", value: mi.accepted },
+          { label: "Veröffentlicht", value: mi.published },
+        ].map((stat) => (
+          <Card key={stat.label} className="p-5">
+            <p className="text-sm text-gray-500">{stat.label}</p>
+            <p className="mt-2 text-3xl font-semibold text-gray-900">
+              {stat.value}
+            </p>
+          </Card>
+        ))}
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Card className="p-5">
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+            Erfolgreichste Themen
+          </h3>
+          {mi.topTopics.length === 0 ? (
+            <p className="text-sm text-gray-500">—</p>
+          ) : (
+            <ul className="space-y-1 text-sm text-gray-700">
+              {mi.topTopics.map((t) => (
+                <li key={t.key}>
+                  {t.key} — {t.rate}% ({t.attempts})
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card className="p-5">
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+            Erfolgreichste Medien
+          </h3>
+          {mi.topMedia.length === 0 ? (
+            <p className="text-sm text-gray-500">—</p>
+          ) : (
+            <ul className="space-y-1 text-sm text-gray-700">
+              {mi.topMedia.map((m) => (
+                <li key={m.outlet}>
+                  {m.outlet} — {m.accepted} Zusagen
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card className="p-5">
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+            Erfolgreichste Winkel
+          </h3>
+          {mi.topAngles.length === 0 ? (
+            <p className="text-sm text-gray-500">—</p>
+          ) : (
+            <ul className="space-y-1 text-sm text-gray-700">
+              {mi.topAngles.map((a) => (
+                <li key={a.key}>
+                  {a.key} — {a.rate}% ({a.attempts})
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       </div>
 
       <h2 className="mt-8 mb-3 text-lg font-semibold text-gray-900">

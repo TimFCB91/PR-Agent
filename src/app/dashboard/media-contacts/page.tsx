@@ -63,7 +63,12 @@ export default async function MediaContactsPage() {
               {contacts.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="px-5 py-3 font-medium text-gray-900">
-                    {c.firstName} {c.lastName}
+                    <Link
+                      href={`/dashboard/media-contacts/${c.id}`}
+                      className="hover:underline"
+                    >
+                      {c.firstName} {c.lastName}
+                    </Link>
                   </td>
                   <td className="px-5 py-3 text-gray-600">{c.email}</td>
                   <td className="px-5 py-3 text-gray-600">{c.outlet ?? "—"}</td>

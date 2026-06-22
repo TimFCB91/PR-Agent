@@ -119,6 +119,29 @@ export const outreachSchema = z.object({
   agreedTopic: optionalString,
   publicationUrl: optionalString,
   internalNotes: optionalString,
+  // Media intelligence — captured response signals.
+  responseReceivedAt: optionalDate,
+  responseType: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z
+      .enum([
+        "NO_RESPONSE",
+        "INTERESTED",
+        "ACCEPTED",
+        "DECLINED",
+        "NEEDS_MORE_INFO",
+        "OUT_OF_OFFICE",
+        "WRONG_CONTACT",
+      ])
+      .optional(),
+  ),
+  responseSummary: optionalString,
+  rejectionReason: optionalString,
+  acceptedAngle: optionalString,
+  publicationCreated: z
+    .string()
+    .optional()
+    .transform((v) => v === "on" || v === "true"),
 });
 
 // ClientRawInput (1) ----------------------------------------------------------

@@ -8,6 +8,7 @@ import {
   referencesFromChunks,
   missingInfoFor,
 } from "@/lib/ai/agents/knowledgeContext";
+import { topicSimilarity } from "@/lib/media/mediaPerformanceCalculator";
 
 const level = z.enum(["LOW", "MEDIUM", "HIGH"]);
 
@@ -22,6 +23,11 @@ export const topicInputSchema = z.object({
   ),
   // Retrieved knowledge chunks (mandatory pre-step).
   sources: z.array(knowledgeChunkInput),
+  // Media-intelligence: topics that historically succeeded / failed.
+  history: z.object({
+    successes: z.array(z.string()),
+    failures: z.array(z.string()),
+  }),
 });
 
 export const topicOutputSchema = z.object({
@@ -33,6 +39,7 @@ export const topicOutputSchema = z.object({
       mediaAngle: z.string(),
       searchPotential: level,
       priority: level,
+      historicalNote: z.string(),
     }),
   ),
   sourceReferences: z.array(sourceReferenceOutput),
@@ -62,13 +69,31 @@ const definition: AgentDefinition<TopicAgentInput, TopicAgentOutput> = {
       .filter((k) => !["NO_GO", "RISK", "MISSING_INFO"].includes(k.category))
       .map((k) => {
         const high = HIGH_VALUE.includes(k.category);
+        const title = `Themenidee: ${k.title}`;
+        // Historical adjustment: boost when similar topics succeeded, warn when
+        // they often failed.
+        const succeeded = input.history.successes.some(
+          (s) => topicSimilarity(title, s) >= 0.34,
+        );
+        const failed = input.history.failures.some(
+          (f) => topicSimilarity(title, f) >= 0.34,
+        );
+        let priority: "LOW" | "MEDIUM" | "HIGH" = high ? "HIGH" : "LOW";
+        let historicalNote = "";
+        if (succeeded) {
+          priority = "HIGH";
+          historicalNote = "Ähnliche Themen waren in der Vergangenheit erfolgreich.";
+        } else if (failed) {
+          historicalNote = "Warnung: Ähnliche Themen wurden häufig abgelehnt.";
+        }
         return {
-          title: `Themenidee: ${k.title}`,
+          title,
           relevance: (high ? "HIGH" : "MEDIUM") as "HIGH" | "MEDIUM",
           targetMediaType: high ? "Online-Leitmedien" : "Fachpresse",
           mediaAngle: ANGLE[k.category] ?? "Allgemeiner Pitch",
           searchPotential: (high ? "HIGH" : "MEDIUM") as "HIGH" | "MEDIUM",
-          priority: (high ? "HIGH" : "LOW") as "HIGH" | "LOW",
+          priority,
+          historicalNote,
         };
       }),
     sourceReferences: referencesFromChunks(input.sources),

@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 import { chunkText } from "../src/lib/knowledge/chunker";
+import { recomputeAllContacts } from "../src/lib/media/mediaIntelligence";
 
 const prisma = new PrismaClient();
 
@@ -147,6 +148,9 @@ async function main() {
       sentAt: new Date("2026-03-05"),
       lastContactDate: new Date("2026-03-12"),
       agreedTopic: "Vorab-Test City-E-Bike",
+      responseReceivedAt: new Date("2026-03-07"),
+      responseType: "INTERESTED",
+      acceptedAngle: "Produkttest",
     },
   });
 
@@ -159,10 +163,12 @@ async function main() {
       status: "FOLLOW_UP_DUE",
       sentAt: new Date("2026-03-08"),
       nextFollowUpDate: new Date("2026-03-20"),
+      responseType: "NO_RESPONSE",
+      followUpCount: 1,
     },
   });
 
-  await prisma.outreach.create({
+  const acmePubOutreach = await prisma.outreach.create({
     data: {
       organizationId: acme.id,
       campaignId: acmeCampaign.id,
@@ -170,6 +176,11 @@ async function main() {
       subject: "Gastbeitrag zu E-Mobilität",
       status: "PUBLISHED",
       sentAt: new Date("2026-02-20"),
+      responseReceivedAt: new Date("2026-02-22"),
+      responseType: "ACCEPTED",
+      acceptedAngle: "Servicenutzen",
+      agreedTopic: "E-Mobilität im Alltag",
+      publicationCreated: true,
       publicationUrl: "https://test-blog.test/e-mobilitaet",
     },
   });
@@ -303,7 +314,33 @@ async function main() {
       title: "Gastbeitrag: E-Mobilität im Alltag",
       url: "https://test-blog.test/e-mobilitaet",
       publicationDate: new Date("2026-03-01"),
+      resultingTopic: "E-Mobilität im Alltag",
+      resultingAngle: "Servicenutzen",
+      sourceOutreachId: acmePubOutreach.id,
     },
+  });
+
+  // Log media interactions (the learning signal).
+  await prisma.mediaInteraction.createMany({
+    data: [
+      {
+        organizationId: acme.id,
+        mediaContactId: acmeContacts[2].id,
+        outreachId: acmePubOutreach.id,
+        interactionType: "PUBLICATION",
+        result: "PUBLISHED",
+        topicTitle: "E-Mobilität im Alltag",
+        mediaAngle: "Servicenutzen",
+      },
+      {
+        organizationId: acme.id,
+        mediaContactId: acmeContacts[0].id,
+        interactionType: "RESPONSE",
+        result: "INTERESTED",
+        topicTitle: "Vorab-Test City-E-Bike",
+        mediaAngle: "Produkttest",
+      },
+    ],
   });
 
   // Reference the raw input + insight so unused-var checks stay clean.
@@ -535,6 +572,11 @@ async function main() {
       sentAt: new Date("2026-05-10"),
     },
   });
+
+  // Build media intelligence (MediaPerformance + JournalistPreference) from the
+  // seeded interactions.
+  await recomputeAllContacts(acme.id);
+  await recomputeAllContacts(globe.id);
 
   console.log("Seed complete.");
   console.log("");

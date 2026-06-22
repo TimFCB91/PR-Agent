@@ -127,6 +127,46 @@ export function computeContactMetrics(
   };
 }
 
+export interface SuccessRate {
+  key: string;
+  attempts: number;
+  successes: number;
+  rate: number; // 0-100
+}
+
+// Success rate per topic / per angle: an attempt is a sent outreach carrying
+// that topic/angle; a success is an acceptance or publication.
+export function computeTopicAngleRates(outreaches: OutreachRecord[]): {
+  topics: SuccessRate[];
+  angles: SuccessRate[];
+} {
+  const sent = outreaches.filter(isSent);
+
+  const rate = (
+    keyOf: (o: OutreachRecord) => string | null | undefined,
+  ): SuccessRate[] => {
+    const attempts = new Map<string, number>();
+    const successes = new Map<string, number>();
+    for (const o of sent) {
+      const key = keyOf(o)?.trim();
+      if (!key) continue;
+      attempts.set(key, (attempts.get(key) ?? 0) + 1);
+      if (isAccepted(o)) successes.set(key, (successes.get(key) ?? 0) + 1);
+    }
+    return [...attempts.entries()]
+      .map(([key, a]) => {
+        const s = successes.get(key) ?? 0;
+        return { key, attempts: a, successes: s, rate: Math.round((s / a) * 1000) / 10 };
+      })
+      .sort((x, y) => y.rate - x.rate || y.attempts - x.attempts);
+  };
+
+  return {
+    topics: rate((o) => o.agreedTopic),
+    angles: rate((o) => o.acceptedAngle),
+  };
+}
+
 /** Word-overlap similarity (0-1) used to spot "already worked on a similar topic". */
 export function topicSimilarity(a: string, b: string): number {
   const wordsOf = (s: string) =>

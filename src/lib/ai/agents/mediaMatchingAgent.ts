@@ -22,6 +22,13 @@ export const mediaMatchInputSchema = z.object({
       name: z.string(),
       outlet: z.string().nullish(),
       beat: z.string().nullish(),
+      // Media intelligence — historical performance per contact.
+      replyRate: z.number(),
+      acceptanceRate: z.number(),
+      publicationRate: z.number(),
+      preferredAngles: z.array(z.string()),
+      avoidedTopics: z.array(z.string()),
+      lastSuccessfulTopic: z.string().nullish(),
     }),
   ),
   sources: z.array(knowledgeChunkInput),
@@ -31,7 +38,8 @@ export const mediaMatchOutputSchema = z.object({
   matches: z.array(
     z.object({
       mediaContactId: z.string(),
-      matchScore: z.number(), // 0-100
+      matchScore: z.number(), // 0-100 (fit)
+      historicalSuccessScore: z.number(), // 0-100 (track record)
       reason: z.string(),
       suggestedAngle: z.string(),
     }),
@@ -58,15 +66,36 @@ const definition: AgentDefinition<MediaMatchInput, MediaMatchOutput> = {
   buildMessages: (input) => PROMPTS.mediaMatchingAgent(input),
   mock: (input) => ({
     matches: input.mediaContacts
-      .map((c) => ({
-        mediaContactId: c.id,
-        matchScore: score(input.topic.title, c.beat, c.outlet),
-        reason: c.beat
-          ? `Ressort „${c.beat}" passt zum Thema.`
-          : "Allgemeiner Kontakt ohne spezifisches Ressort.",
-        suggestedAngle:
-          input.topic.mediaAngle ?? `Thema „${input.topic.title}" anbieten.`,
-      }))
+      .map((c) => {
+        const fit = score(input.topic.title, c.beat, c.outlet);
+        // Historical track record (acceptance + publication weighted, reply minor).
+        const historical = Math.round(
+          0.5 * c.acceptanceRate + 0.3 * c.publicationRate + 0.2 * c.replyRate,
+        );
+        const avoids = c.avoidedTopics.some(
+          (t) => t.toLowerCase() === input.topic.title.toLowerCase(),
+        );
+        // Blend fit + history; penalise topics the contact tends to decline.
+        const matchScore = Math.max(
+          0,
+          Math.round(0.5 * fit + 0.5 * historical - (avoids ? 30 : 0)),
+        );
+        const reasons: string[] = [];
+        if (c.beat) reasons.push(`Ressort „${c.beat}" passt`);
+        if (c.acceptanceRate > 0) reasons.push(`Zusagequote ${c.acceptanceRate}%`);
+        if (c.lastSuccessfulTopic) reasons.push(`zuletzt erfolgreich: „${c.lastSuccessfulTopic}"`);
+        if (avoids) reasons.push("Achtung: ähnliche Themen wurden abgelehnt");
+        return {
+          mediaContactId: c.id,
+          matchScore,
+          historicalSuccessScore: historical,
+          reason: reasons.length ? reasons.join("; ") + "." : "Allgemeiner Kontakt.",
+          suggestedAngle:
+            c.preferredAngles[0] ??
+            input.topic.mediaAngle ??
+            `Thema „${input.topic.title}" anbieten.`,
+        };
+      })
       .sort((a, b) => b.matchScore - a.matchScore),
     sourceReferences: referencesFromChunks(input.sources),
     missingInfo: missingInfoFor(input.sources, input.topic.title),

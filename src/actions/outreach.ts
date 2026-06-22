@@ -15,6 +15,11 @@ import {
   runAndStoreQuality,
 } from "@/lib/quality/reportStore";
 import { gatherKnowledge, saveSourceRefs } from "@/lib/knowledge/sources";
+import {
+  getContactStatForPitch,
+  recordInteraction,
+  recomputeContact,
+} from "@/lib/media/mediaIntelligence";
 
 // Make sure both the campaign and the media contact belong to the tenant
 // before an outreach links them together.
@@ -108,6 +113,31 @@ export async function updateOutreachAction(
     return { ok: false, error: "Outreach nicht gefunden." };
   }
 
+  // Media intelligence: when a response is captured, log the interaction and
+  // recompute the contact's performance + preferences.
+  if (parsed.data.responseType) {
+    const resultMap: Record<string, "NO_RESPONSE" | "INTERESTED" | "ACCEPTED" | "DECLINED"> = {
+      NO_RESPONSE: "NO_RESPONSE",
+      INTERESTED: "INTERESTED",
+      ACCEPTED: "ACCEPTED",
+      DECLINED: "DECLINED",
+      NEEDS_MORE_INFO: "INTERESTED",
+      OUT_OF_OFFICE: "NO_RESPONSE",
+      WRONG_CONTACT: "NO_RESPONSE",
+    };
+    await recordInteraction({
+      organizationId: tenant.organizationId,
+      mediaContactId: parsed.data.mediaContactId,
+      outreachId: id,
+      interactionType: "RESPONSE",
+      result: resultMap[parsed.data.responseType],
+      topicTitle: parsed.data.agreedTopic,
+      mediaAngle: parsed.data.acceptedAngle,
+      notes: parsed.data.responseSummary,
+    });
+    await recomputeContact(parsed.data.mediaContactId, tenant.organizationId);
+  }
+
   revalidatePath("/dashboard/outreach");
   redirect("/dashboard/outreach");
 }
@@ -151,6 +181,12 @@ export async function generatePitchAction(formData: FormData): Promise<void> {
   // Mandatory retrieval step.
   const gathered = await gatherKnowledge(clientId, tenant.organizationId, topicTitle);
 
+  // Media intelligence: this contact's track record informs the pitch.
+  const contactStat = await getContactStatForPitch(
+    outreach.mediaContactId,
+    tenant.organizationId,
+  );
+
   const [pitch, followUp] = await Promise.all([
     runPitchAgent(
       {
@@ -159,6 +195,14 @@ export async function generatePitchAction(formData: FormData): Promise<void> {
         contactFirstName: outreach.mediaContact.firstName,
         contactOutlet: outreach.mediaContact.outlet,
         sources: gathered.chunks,
+        contactStats: contactStat
+          ? {
+              acceptanceRate: contactStat.acceptanceRate,
+              replyRate: contactStat.replyRate,
+              preferredAngles: contactStat.preferredAngles,
+              lastSuccessfulTopic: contactStat.lastSuccessfulTopic,
+            }
+          : null,
       },
       agentCtx,
     ),

@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireTenant, canWrite } from "@/lib/tenant";
 import { getCampaignReport } from "@/lib/reporting";
+import {
+  getCampaignMediaIntelligence,
+  getOrgMediaIntelligenceSummary,
+} from "@/lib/media/mediaIntelligence";
 import { toggleCampaignShareAction } from "@/actions/campaigns";
 import { ActionButton } from "@/components/action-button";
 import { Card, PageHeader, LinkButton } from "@/components/ui";
@@ -24,6 +28,8 @@ export default async function CampaignDashboardPage({
   if (!campaign) notFound();
 
   const report = await getCampaignReport(campaign.id, organizationId);
+  const mi = await getCampaignMediaIntelligence(campaign.id, organizationId);
+  const summary = await getOrgMediaIntelligenceSummary(organizationId);
 
   const stats = [
     { label: "Themen", value: report.topics },
@@ -86,6 +92,130 @@ export default async function CampaignDashboardPage({
             </div>
           ))}
         </dl>
+      </Card>
+
+      <h2 className="mt-8 mb-3 text-lg font-semibold text-gray-900">
+        Media Intelligence
+      </h2>
+      <Card className="space-y-6 p-5">
+        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div>
+            <dt className="text-sm text-gray-500">Kontaktiert</dt>
+            <dd className="mt-1 text-2xl font-semibold text-gray-900">
+              {mi.contacted}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-sm text-gray-500">Geantwortet</dt>
+            <dd className="mt-1 text-2xl font-semibold text-gray-900">
+              {mi.responded}{" "}
+              <span className="text-sm font-normal text-gray-500">
+                ({mi.replyRate}%)
+              </span>
+            </dd>
+          </div>
+          <div>
+            <dt className="text-sm text-gray-500">Zusagen</dt>
+            <dd className="mt-1 text-2xl font-semibold text-gray-900">
+              {mi.accepted}{" "}
+              <span className="text-sm font-normal text-gray-500">
+                ({mi.acceptanceRate}%)
+              </span>
+            </dd>
+          </div>
+          <div>
+            <dt className="text-sm text-gray-500">Veröffentlicht</dt>
+            <dd className="mt-1 text-2xl font-semibold text-gray-900">
+              {mi.published}{" "}
+              <span className="text-sm font-normal text-gray-500">
+                ({mi.publicationRate}%)
+              </span>
+            </dd>
+          </div>
+        </dl>
+
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-gray-900">
+              Top Medien
+            </h3>
+            {mi.topMedia.length === 0 ? (
+              <p className="text-sm text-gray-500">—</p>
+            ) : (
+              <ul className="space-y-1 text-sm text-gray-700">
+                {mi.topMedia.map((m) => (
+                  <li key={m.outlet}>
+                    {m.outlet} — {m.accepted} Zusagen
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-gray-900">
+              Häufigste Ablehnungsgründe
+            </h3>
+            {mi.rejectionReasons.length === 0 ? (
+              <p className="text-sm text-gray-500">—</p>
+            ) : (
+              <ul className="space-y-1 text-sm text-gray-700">
+                {mi.rejectionReasons.map((r) => (
+                  <li key={r.reason}>
+                    {r.reason} — {r.count}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-gray-900">
+              Top Themen
+            </h3>
+            {mi.topTopics.length === 0 ? (
+              <p className="text-sm text-gray-500">—</p>
+            ) : (
+              <ul className="space-y-1 text-sm text-gray-700">
+                {mi.topTopics.map((t) => (
+                  <li key={t.key}>
+                    {t.key} — {t.rate}% ({t.attempts})
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-gray-900">
+              Top Winkel
+            </h3>
+            {mi.topAngles.length === 0 ? (
+              <p className="text-sm text-gray-500">—</p>
+            ) : (
+              <ul className="space-y-1 text-sm text-gray-700">
+                {mi.topAngles.map((a) => (
+                  <li key={a.key}>
+                    {a.key} — {a.rate}% ({a.attempts})
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        {summary.length > 0 && (
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-gray-900">
+              Muster (organisationsweit)
+            </h3>
+            <ul className="list-inside list-disc space-y-1 text-sm text-gray-700">
+              {summary.map((line, i) => (
+                <li key={i}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Card>
 
       <h2 className="mt-8 mb-3 text-lg font-semibold text-gray-900">

@@ -46,6 +46,21 @@ enum ResponseType {
   WRONG_CONTACT
 }
 
+enum InteractionType {
+  PITCH
+  FOLLOW_UP
+  RESPONSE
+  PUBLICATION
+}
+
+enum InteractionResult {
+  NO_RESPONSE
+  INTERESTED
+  ACCEPTED
+  DECLINED
+  PUBLISHED
+}
+
 enum OutreachStatus {
   DRAFT
   READY
@@ -190,6 +205,9 @@ model Organization {
   knowledgeDocuments KnowledgeDocument[]
   knowledgeChunks    KnowledgeChunk[]
   knowledgeSourceRefs KnowledgeSourceRef[]
+  mediaPerformances  MediaPerformance[]
+  mediaInteractions  MediaInteraction[]
+  journalistPreferences JournalistPreference[]
 }
 
 model User {
@@ -295,6 +313,9 @@ model MediaContact {
   outreaches   Outreach[]
   briefings    Briefing[]
   publications Publication[]
+  performance  MediaPerformance?
+  interactions MediaInteraction[]
+  preference   JournalistPreference?
 
   @@index([organizationId])
 }
@@ -320,6 +341,7 @@ model Outreach {
   rejectionReason    String?
   acceptedAngle      String?
   followUpCount      Int          @default(0)
+  publicationCreated Boolean      @default(false)
   campaignId     String
   mediaContactId String
   organizationId String
@@ -330,6 +352,7 @@ model Outreach {
   campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   mediaContact MediaContact @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
   sourcedPublications Publication[] @relation("PublicationSource")
+  interactions MediaInteraction[]
 
   @@index([organizationId])
   @@index([campaignId])
@@ -711,4 +734,72 @@ model KnowledgeSourceRef {
 
   @@index([organizationId])
   @@index([entityType, entityId])
+}
+
+// ----------------------------------------------------------------------------
+// Media intelligence (extends MediaContact/Outreach/Campaign/Publication —
+// NOT a separate platform). Learns from real interactions.
+// ----------------------------------------------------------------------------
+
+// Aggregated, cached performance per media contact (recomputed from history).
+model MediaPerformance {
+  id                       String   @id @default(cuid())
+  totalPitches             Int      @default(0)
+  totalReplies             Int      @default(0)
+  totalAcceptances         Int      @default(0)
+  totalPublications        Int      @default(0)
+  replyRate                Float    @default(0)
+  acceptanceRate           Float    @default(0)
+  publicationRate          Float    @default(0)
+  averageResponseTimeHours Float?
+  mediaContactId           String   @unique
+  organizationId           String
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mediaContact MediaContact @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// A single logged interaction with a media contact (the learning signal).
+model MediaInteraction {
+  id             String             @id @default(cuid())
+  interactionType InteractionType
+  topicTitle     String?
+  mediaAngle     String?
+  result         InteractionResult?
+  notes          String?
+  mediaContactId String
+  outreachId     String?
+  organizationId String
+  createdAt      DateTime           @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mediaContact MediaContact @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
+  outreach     Outreach?    @relation(fields: [outreachId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([mediaContactId])
+}
+
+// Derived journalist preferences (built automatically from interactions).
+model JournalistPreference {
+  id              String   @id @default(cuid())
+  preferredTopics String[] @default([])
+  preferredAngles String[] @default([])
+  avoidedTopics   String[] @default([])
+  preferredFormats String[] @default([])
+  notes           String?
+  confidence      Int      @default(0) // 0-100
+  mediaContactId  String   @unique
+  organizationId  String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mediaContact MediaContact @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }
