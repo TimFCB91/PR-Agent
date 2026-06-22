@@ -1,6 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
+import { chunkText } from "../src/lib/knowledge/chunker";
+
 const prisma = new PrismaClient();
 
 const DEMO_PASSWORD = "password123";
@@ -196,6 +198,30 @@ async function main() {
       status: "NEW",
       rawText: "Kurze Notiz.",
     },
+  });
+
+  // ---- Knowledge document + chunks (retrieval) from the website raw input ----
+  const acmeDoc = await prisma.knowledgeDocument.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      rawInputId: acmeRaw.id,
+      title: acmeRaw.title,
+      sourceType: "WEBSITE",
+      sourceName: "nordwind.test",
+      content: acmeRaw.rawText ?? "",
+      status: "ACTIVE",
+    },
+  });
+  await prisma.knowledgeChunk.createMany({
+    data: chunkText(acmeRaw.rawText ?? "").map((c) => ({
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      documentId: acmeDoc.id,
+      chunkIndex: c.index,
+      content: c.content,
+      metadata: { sourceType: "WEBSITE", title: acmeRaw.title },
+    })),
   });
 
   const acmeInsight = await prisma.clientInsight.create({

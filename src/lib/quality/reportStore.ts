@@ -25,7 +25,7 @@ export async function buildClientEvidence(
   organizationId: string,
 ): Promise<string> {
   const scope = { clientId, organizationId };
-  const [client, raw, insights, knowledge] = await Promise.all([
+  const [client, raw, insights, knowledge, docs] = await Promise.all([
     prisma.client.findFirst({
       where: { id: clientId, organizationId },
       select: { name: true, notes: true, website: true },
@@ -42,6 +42,12 @@ export async function buildClientEvidence(
       where: scope,
       select: { title: true, content: true },
     }),
+    // Knowledge documents make the searchable knowledge part of the evidence
+    // corpus, so FactSafety can trace facts back to stored sources.
+    prisma.knowledgeDocument.findMany({
+      where: { ...scope, status: "ACTIVE" },
+      select: { title: true, content: true },
+    }),
   ]);
 
   return [
@@ -51,6 +57,7 @@ export async function buildClientEvidence(
     ...raw.map((r) => `${r.title} ${r.rawText ?? ""}`),
     ...insights.map((i) => `${i.title} ${i.content ?? ""}`),
     ...knowledge.map((k) => `${k.title} ${k.content ?? ""}`),
+    ...docs.map((d) => `${d.title} ${d.content}`),
   ]
     .filter(Boolean)
     .join("\n");

@@ -187,6 +187,9 @@ model Organization {
   knowledgeEdges  KnowledgeEdge[]
   aiUsageLogs     AIUsageLog[]
   textQualityReports TextQualityReport[]
+  knowledgeDocuments KnowledgeDocument[]
+  knowledgeChunks    KnowledgeChunk[]
+  knowledgeSourceRefs KnowledgeSourceRef[]
 }
 
 model User {
@@ -232,6 +235,8 @@ model Client {
   knowledge      ClientKnowledge[]
   knowledgeNodes KnowledgeNode[]
   knowledgeEdges KnowledgeEdge[]
+  knowledgeDocuments KnowledgeDocument[]
+  knowledgeChunks    KnowledgeChunk[]
 
   @@index([organizationId])
 }
@@ -258,6 +263,7 @@ model Campaign {
   briefings     Briefing[]
   articleDrafts ArticleDraft[]
   publications  Publication[]
+  knowledgeDocuments KnowledgeDocument[]
 
   @@index([organizationId])
   @@index([clientId])
@@ -351,6 +357,7 @@ model ClientRawInput {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdBy    User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  knowledgeDocuments KnowledgeDocument[]
 
   @@index([organizationId])
   @@index([clientId])
@@ -628,4 +635,80 @@ model AIUsageLog {
 
   @@index([organizationId])
   @@index([createdAt])
+}
+
+// ----------------------------------------------------------------------------
+// Knowledge retrieval (extends the client intake — NOT a separate store)
+// ----------------------------------------------------------------------------
+
+enum KnowledgeDocStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+// A durable, searchable document built from a ClientRawInput (or pasted text).
+// The original ClientRawInput is preserved; this is the retrieval-ready form.
+model KnowledgeDocument {
+  id             String             @id @default(cuid())
+  title          String
+  sourceType     RawInputSourceType @default(NOTE)
+  sourceName     String?
+  content        String
+  status         KnowledgeDocStatus @default(ACTIVE)
+  clientId       String
+  campaignId     String?
+  rawInputId     String?
+  organizationId String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign     Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  rawInput     ClientRawInput? @relation(fields: [rawInputId], references: [id], onDelete: SetNull)
+  chunks       KnowledgeChunk[]
+
+  @@index([organizationId])
+  @@index([clientId])
+}
+
+// A retrievable slice of a KnowledgeDocument. `embedding` is prepared for
+// semantic search (pgvector / OpenAI / Voyage / local); empty until enabled.
+model KnowledgeChunk {
+  id             String   @id @default(cuid())
+  chunkIndex     Int
+  content        String
+  embedding      Float[]  @default([])
+  metadata       Json?
+  documentId     String
+  clientId       String
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  document     KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  client       Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([documentId])
+}
+
+// Source references actually used by an agent for a produced entity (topic,
+// pitch, briefing, article, follow-up, media match) — makes outputs traceable.
+model KnowledgeSourceRef {
+  id             String   @id @default(cuid())
+  entityType     String // TOPIC | PITCH | FOLLOW_UP | BRIEFING | ARTICLE | MEDIA_MATCH
+  entityId       String
+  documentId     String?
+  chunkId        String?
+  sourceType     String?
+  shortExcerpt   String?
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([entityType, entityId])
 }

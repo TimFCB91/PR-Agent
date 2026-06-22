@@ -16,6 +16,7 @@ import {
   getRuleSetForType,
   runAndStoreQuality,
 } from "@/lib/quality/reportStore";
+import { gatherKnowledge, saveSourceRefs } from "@/lib/knowledge/sources";
 
 function revClient(clientId: string) {
   revalidatePath(`/dashboard/clients/${clientId}`);
@@ -106,14 +107,22 @@ export async function generateTopicsFromKnowledgeAction(
     select: { category: true, title: true, content: true },
   });
 
+  // Mandatory retrieval step.
+  const gathered = await gatherKnowledge(
+    clientId,
+    tenant.organizationId,
+    `${client.name} Themen Positionierung Expertise`,
+  );
+
   const result = await runTopicAgent(
-    { clientName: client.name, knowledge },
+    { clientName: client.name, knowledge, sources: gathered.chunks },
     { organizationId: tenant.organizationId, userId: tenant.userId },
   );
 
-  if (result.topics.length > 0) {
-    await prisma.topicIdea.createMany({
-      data: result.topics.map((t) => ({
+  // Create topics individually so each can carry its source references.
+  for (const t of result.topics) {
+    const topic = await prisma.topicIdea.create({
+      data: {
         clientId,
         organizationId: tenant.organizationId,
         title: t.title,
@@ -123,8 +132,15 @@ export async function generateTopicsFromKnowledgeAction(
         newsValue: t.relevance as Level,
         priority: t.priority as Level,
         status: "DRAFT" as const,
-      })),
+      },
+      select: { id: true },
     });
+    await saveSourceRefs(
+      "TOPIC",
+      topic.id,
+      tenant.organizationId,
+      result.sourceReferences,
+    );
   }
 
   revClient(clientId);
@@ -151,6 +167,13 @@ export async function buildBriefingViaAgentAction(
     select: { category: true, title: true },
   });
 
+  const gathered = await gatherKnowledge(
+    topic.clientId,
+    tenant.organizationId,
+    `${topic.title} ${topic.mediaAngle ?? ""}`,
+    { campaignId: topic.campaignId },
+  );
+
   const result = await runBriefingAgent(
     {
       clientName: topic.client.name,
@@ -160,6 +183,7 @@ export async function buildBriefingViaAgentAction(
       targetMediaType: topic.targetMediaType,
       keyInsights: knowledge.filter((k) => k.category !== "NO_GO").map((k) => k.title),
       noGos: knowledge.filter((k) => k.category === "NO_GO").map((k) => k.title),
+      sources: gathered.chunks,
     },
     { organizationId: tenant.organizationId, userId: tenant.userId },
   );
@@ -181,6 +205,13 @@ export async function buildBriefingViaAgentAction(
     },
     select: { id: true },
   });
+
+  await saveSourceRefs(
+    "BRIEFING",
+    briefing.id,
+    tenant.organizationId,
+    result.sourceReferences,
+  );
 
   // Quality review of the briefing's key messages.
   await runAndStoreQuality({
@@ -222,6 +253,13 @@ export async function buildArticleViaAgentAction(
     orderBy: { createdAt: "asc" },
   });
 
+  const gathered = await gatherKnowledge(
+    briefing.clientId,
+    tenant.organizationId,
+    `${briefing.title} ${briefing.angle ?? ""}`,
+    { campaignId: briefing.campaignId },
+  );
+
   const result = await runArticleAgent(
     {
       clientName: briefing.client.name,
@@ -230,6 +268,7 @@ export async function buildArticleViaAgentAction(
       keyMessages: briefing.keyMessages,
       suggestedStructure: briefing.suggestedStructure,
       targetAudience: briefing.targetAudience,
+      sources: gathered.chunks,
       rules: ruleSet
         ? {
             toneOfVoice: ruleSet.toneOfVoice,
@@ -269,6 +308,13 @@ export async function buildArticleViaAgentAction(
     ruleSet: await getRuleSetForType(tenant.organizationId, "ARTICLE"),
   });
 
+  await saveSourceRefs(
+    "ARTICLE",
+    article.id,
+    tenant.organizationId,
+    result.sourceReferences,
+  );
+
   // Generated articles always land in REVIEW; approval is a manual quality step.
   void report;
   await prisma.articleDraft.updateMany({
@@ -307,6 +353,13 @@ export async function matchAndCreateOutreachAction(
   });
   if (contacts.length === 0) return;
 
+  const gathered = await gatherKnowledge(
+    topic.clientId,
+    tenant.organizationId,
+    topic.title,
+    { campaignId: topic.campaignId },
+  );
+
   const result = await runMediaMatchingAgent(
     {
       topic: {
@@ -321,8 +374,16 @@ export async function matchAndCreateOutreachAction(
         outlet: c.outlet,
         beat: c.beat,
       })),
+      sources: gathered.chunks,
     },
     { organizationId: tenant.organizationId, userId: tenant.userId },
+  );
+
+  await saveSourceRefs(
+    "MEDIA_MATCH",
+    topic.id,
+    tenant.organizationId,
+    result.sourceReferences,
   );
 
   const top = result.matches.slice(0, 3);
@@ -366,12 +427,19 @@ export async function generateFollowUpViaAgentAction(
   });
   if (!outreach) return;
 
+  const gathered = await gatherKnowledge(
+    outreach.campaign.client.id,
+    tenant.organizationId,
+    outreach.agreedTopic ?? outreach.subject,
+  );
+
   const result = await runFollowUpAgent(
     {
       variant,
       clientName: outreach.campaign.client.name,
       topicTitle: outreach.agreedTopic ?? outreach.subject,
       contactFirstName: outreach.mediaContact.firstName,
+      sources: gathered.chunks,
     },
     { organizationId: tenant.organizationId, userId: tenant.userId },
   );
@@ -380,6 +448,13 @@ export async function generateFollowUpViaAgentAction(
     where: { id, organizationId: tenant.organizationId },
     data: { followUpEmail: result.message },
   });
+
+  await saveSourceRefs(
+    "FOLLOW_UP",
+    id,
+    tenant.organizationId,
+    result.sourceReferences,
+  );
 
   // Quality review of the follow-up.
   await runAndStoreQuality({

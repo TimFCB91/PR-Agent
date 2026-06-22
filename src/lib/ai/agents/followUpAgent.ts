@@ -3,6 +3,12 @@ import { z } from "zod";
 import { PROMPTS } from "@/lib/ai/prompts";
 import { generateFollowUpEmail } from "@/lib/outreach/outreachManager";
 import { runAgent, type AgentContext, type AgentDefinition } from "@/lib/ai/agents/runAgent";
+import {
+  knowledgeChunkInput,
+  sourceReferenceOutput,
+  referencesFromChunks,
+  missingInfoFor,
+} from "@/lib/ai/agents/knowledgeContext";
 
 // The four supported follow-up variants.
 export const followUpVariant = z.enum([
@@ -17,11 +23,14 @@ export const followUpInputSchema = z.object({
   clientName: z.string(),
   topicTitle: z.string().nullish(),
   contactFirstName: z.string().nullish(),
+  sources: z.array(knowledgeChunkInput),
 });
 
 export const followUpOutputSchema = z.object({
   subject: z.string(),
   message: z.string(),
+  sourceReferences: z.array(sourceReferenceOutput),
+  missingInfo: z.array(z.string()),
 });
 
 export type FollowUpAgentInput = z.infer<typeof followUpInputSchema>;
@@ -61,6 +70,8 @@ const definition: AgentDefinition<FollowUpAgentInput, FollowUpAgentOutput> = {
   mock: (input) => ({
     subject: SUBJECTS[input.variant],
     message: mockMessage(input),
+    sourceReferences: referencesFromChunks(input.sources),
+    missingInfo: missingInfoFor(input.sources, input.topicTitle ?? input.clientName),
   }),
 };
 

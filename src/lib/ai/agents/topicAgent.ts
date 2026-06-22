@@ -2,6 +2,12 @@ import { z } from "zod";
 
 import { PROMPTS } from "@/lib/ai/prompts";
 import { runAgent, type AgentContext, type AgentDefinition } from "@/lib/ai/agents/runAgent";
+import {
+  knowledgeChunkInput,
+  sourceReferenceOutput,
+  referencesFromChunks,
+  missingInfoFor,
+} from "@/lib/ai/agents/knowledgeContext";
 
 const level = z.enum(["LOW", "MEDIUM", "HIGH"]);
 
@@ -14,6 +20,8 @@ export const topicInputSchema = z.object({
       content: z.string().nullish(),
     }),
   ),
+  // Retrieved knowledge chunks (mandatory pre-step).
+  sources: z.array(knowledgeChunkInput),
 });
 
 export const topicOutputSchema = z.object({
@@ -27,6 +35,8 @@ export const topicOutputSchema = z.object({
       priority: level,
     }),
   ),
+  sourceReferences: z.array(sourceReferenceOutput),
+  missingInfo: z.array(z.string()),
 });
 
 export type TopicAgentInput = z.infer<typeof topicInputSchema>;
@@ -61,6 +71,8 @@ const definition: AgentDefinition<TopicAgentInput, TopicAgentOutput> = {
           priority: (high ? "HIGH" : "LOW") as "HIGH" | "LOW",
         };
       }),
+    sourceReferences: referencesFromChunks(input.sources),
+    missingInfo: missingInfoFor(input.sources, input.clientName),
   }),
 };
 

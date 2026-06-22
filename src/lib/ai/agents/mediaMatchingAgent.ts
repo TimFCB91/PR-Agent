@@ -2,6 +2,12 @@ import { z } from "zod";
 
 import { PROMPTS } from "@/lib/ai/prompts";
 import { runAgent, type AgentContext, type AgentDefinition } from "@/lib/ai/agents/runAgent";
+import {
+  knowledgeChunkInput,
+  sourceReferenceOutput,
+  referencesFromChunks,
+  missingInfoFor,
+} from "@/lib/ai/agents/knowledgeContext";
 
 export const mediaMatchInputSchema = z.object({
   topic: z.object({
@@ -18,6 +24,7 @@ export const mediaMatchInputSchema = z.object({
       beat: z.string().nullish(),
     }),
   ),
+  sources: z.array(knowledgeChunkInput),
 });
 
 export const mediaMatchOutputSchema = z.object({
@@ -29,6 +36,8 @@ export const mediaMatchOutputSchema = z.object({
       suggestedAngle: z.string(),
     }),
   ),
+  sourceReferences: z.array(sourceReferenceOutput),
+  missingInfo: z.array(z.string()),
 });
 
 export type MediaMatchInput = z.infer<typeof mediaMatchInputSchema>;
@@ -59,6 +68,8 @@ const definition: AgentDefinition<MediaMatchInput, MediaMatchOutput> = {
           input.topic.mediaAngle ?? `Thema „${input.topic.title}" anbieten.`,
       }))
       .sort((a, b) => b.matchScore - a.matchScore),
+    sourceReferences: referencesFromChunks(input.sources),
+    missingInfo: missingInfoFor(input.sources, input.topic.title),
   }),
 };
 

@@ -3,6 +3,12 @@ import { z } from "zod";
 import { PROMPTS } from "@/lib/ai/prompts";
 import { buildBriefing } from "@/lib/briefings/briefingManager";
 import { runAgent, type AgentContext, type AgentDefinition } from "@/lib/ai/agents/runAgent";
+import {
+  knowledgeChunkInput,
+  sourceReferenceOutput,
+  referencesFromChunks,
+  missingInfoFor,
+} from "@/lib/ai/agents/knowledgeContext";
 
 export const briefingInputSchema = z.object({
   clientName: z.string(),
@@ -12,6 +18,7 @@ export const briefingInputSchema = z.object({
   targetMediaType: z.string().nullish(),
   keyInsights: z.array(z.string()),
   noGos: z.array(z.string()),
+  sources: z.array(knowledgeChunkInput),
 });
 
 export const briefingOutputSchema = z.object({
@@ -21,6 +28,8 @@ export const briefingOutputSchema = z.object({
   structure: z.string(),
   expertContext: z.string(),
   noGos: z.string(),
+  sourceReferences: z.array(sourceReferenceOutput),
+  missingInfo: z.array(z.string()),
 });
 
 export type BriefingAgentInput = z.infer<typeof briefingInputSchema>;
@@ -48,6 +57,8 @@ const definition: AgentDefinition<BriefingAgentInput, BriefingAgentOutput> = {
       structure: b.suggestedStructure,
       expertContext: b.expertContext,
       noGos: b.noGos,
+      sourceReferences: referencesFromChunks(input.sources),
+      missingInfo: missingInfoFor(input.sources, input.topicTitle ?? input.clientName),
     };
   },
 };

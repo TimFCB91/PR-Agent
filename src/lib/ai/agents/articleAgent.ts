@@ -3,6 +3,12 @@ import { z } from "zod";
 import { PROMPTS } from "@/lib/ai/prompts";
 import { buildArticleDraft } from "@/lib/articles/articleBuilder";
 import { runAgent, type AgentContext, type AgentDefinition } from "@/lib/ai/agents/runAgent";
+import {
+  knowledgeChunkInput,
+  sourceReferenceOutput,
+  referencesFromChunks,
+  missingInfoFor,
+} from "@/lib/ai/agents/knowledgeContext";
 
 export const articleInputSchema = z.object({
   clientName: z.string(),
@@ -21,6 +27,7 @@ export const articleInputSchema = z.object({
       forbiddenPhrases: z.array(z.string()),
     })
     .nullish(),
+  sources: z.array(knowledgeChunkInput),
 });
 
 export const articleOutputSchema = z.object({
@@ -28,6 +35,8 @@ export const articleOutputSchema = z.object({
   subtitle: z.string(),
   article: z.string(),
   metaDescription: z.string(),
+  sourceReferences: z.array(sourceReferenceOutput),
+  missingInfo: z.array(z.string()),
 });
 
 export type ArticleAgentInput = z.infer<typeof articleInputSchema>;
@@ -64,6 +73,8 @@ const definition: AgentDefinition<ArticleAgentInput, ArticleAgentOutput> = {
       subtitle: a.subtitle,
       article: a.articleText,
       metaDescription: a.metaDescription,
+      sourceReferences: referencesFromChunks(input.sources),
+      missingInfo: missingInfoFor(input.sources, input.briefingTitle ?? input.clientName),
     };
   },
 };

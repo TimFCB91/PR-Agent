@@ -5,6 +5,7 @@ import { requireTenant, canWrite } from "@/lib/tenant";
 import { updateOutreachAction } from "@/actions/outreach";
 import { PageHeader } from "@/components/ui";
 import { QualityPanel } from "@/components/quality-panel";
+import { KnowledgeSources } from "@/components/knowledge-sources";
 import { OutreachForm } from "../../outreach-form";
 
 export default async function EditOutreachPage({
@@ -52,10 +53,12 @@ export default async function EditOutreachPage({
         <div>
           <p className="text-sm font-medium text-gray-700">Pitch-Mail</p>
           <QualityPanel entityType="PITCH" entityId={outreach.id} clientId={outreach.campaign.clientId} organizationId={organizationId} writable={writable} />
+          <KnowledgeSources entityType="PITCH" entityId={outreach.id} organizationId={organizationId} />
         </div>
         <div>
           <p className="text-sm font-medium text-gray-700">Follow-up</p>
           <QualityPanel entityType="FOLLOW_UP" entityId={outreach.id} clientId={outreach.campaign.clientId} organizationId={organizationId} writable={writable} />
+          <KnowledgeSources entityType="FOLLOW_UP" entityId={outreach.id} organizationId={organizationId} />
         </div>
       </div>
     </div>

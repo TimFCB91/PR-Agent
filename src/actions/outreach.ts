@@ -14,6 +14,7 @@ import {
   getRuleSetForType,
   runAndStoreQuality,
 } from "@/lib/quality/reportStore";
+import { gatherKnowledge, saveSourceRefs } from "@/lib/knowledge/sources";
 
 // Make sure both the campaign and the media contact belong to the tenant
 // before an outreach links them together.
@@ -145,6 +146,10 @@ export async function generatePitchAction(formData: FormData): Promise<void> {
   };
   const clientName = outreach.campaign.client.name;
   const topicTitle = outreach.agreedTopic ?? outreach.subject;
+  const clientId = outreach.campaign.client.id;
+
+  // Mandatory retrieval step.
+  const gathered = await gatherKnowledge(clientId, tenant.organizationId, topicTitle);
 
   const [pitch, followUp] = await Promise.all([
     runPitchAgent(
@@ -153,6 +158,7 @@ export async function generatePitchAction(formData: FormData): Promise<void> {
         topicTitle,
         contactFirstName: outreach.mediaContact.firstName,
         contactOutlet: outreach.mediaContact.outlet,
+        sources: gathered.chunks,
       },
       agentCtx,
     ),
@@ -162,10 +168,14 @@ export async function generatePitchAction(formData: FormData): Promise<void> {
         clientName,
         topicTitle,
         contactFirstName: outreach.mediaContact.firstName,
+        sources: gathered.chunks,
       },
       agentCtx,
     ),
   ]);
+
+  await saveSourceRefs("PITCH", id, tenant.organizationId, pitch.sourceReferences);
+  await saveSourceRefs("FOLLOW_UP", id, tenant.organizationId, followUp.sourceReferences);
 
   await prisma.outreach.updateMany({
     where: { id, organizationId: tenant.organizationId },
@@ -176,7 +186,6 @@ export async function generatePitchAction(formData: FormData): Promise<void> {
   });
 
   // Quality review of the generated pitch + follow-up.
-  const clientId = outreach.campaign.client.id;
   const evidence = await buildClientEvidence(clientId, tenant.organizationId);
   await Promise.all([
     runAndStoreQuality({

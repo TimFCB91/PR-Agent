@@ -86,6 +86,9 @@ Rohinformation  →  Erkenntnis  →  Themenidee  →  Briefing  →  Artikelent
 | `KnowledgeEdge`  | Verbindung im Wissensgraph                           | `organizationId` |
 | `AIUsageLog`     | Protokoll aller KI-Agenten-Aufrufe                  | `organizationId` |
 | `TextQualityReport` | Qualitäts-/Faktencheck-Report je generiertem Text | `organizationId` |
+| `KnowledgeDocument` | Durchsuchbares Dokument (aus RawInput/Upload)       | `organizationId` |
+| `KnowledgeChunk`    | Abrufbares Textstück eines Dokuments (Retrieval)    | `organizationId` |
+| `KnowledgeSourceRef`| Vom Agenten genutzte Quelle je Output (Nachweis)    | `organizationId` |
 
 Alle tenant-bezogenen Modelle besitzen eine `organizationId`.
 
@@ -176,6 +179,43 @@ Für lokale Modelle (Ollama, vLLM, LM Studio): `AI_PROVIDER=local` +
 Jeder Agenten-Aufruf wird in **`AIUsageLog`** protokolliert (Agent, Provider,
 Modus, Modell, Tokens, Dauer, Erfolg, Nutzer) – tenant-isoliert. Einsehbar unter
 **Einstellungen → AI**.
+
+## Knowledge Retrieval
+
+Erweitert das Client-Intake (keine separate Wissensdatenbank): Kundeninfos
+werden dauerhaft gespeichert, strukturiert, durchsuchbar und für **alle Agenten**
+abrufbar.
+
+- **`KnowledgeDocument`** – durchsuchbare Form einer Information; wird **beim
+  Anlegen eines `ClientRawInput` automatisch** erzeugt (der Rohinput bleibt
+  erhalten). Kann später aus Website, PDF, Transkript, E-Mail, Social usw.
+  entstehen.
+- **`KnowledgeChunk`** – kontextschonend zerlegte, abrufbare Textstücke
+  (`lib/knowledge/chunker.ts`, absatz-/satzweise, austauschbar). `embedding` ist
+  für Semantic Search vorbereitet.
+- **Retriever** (`lib/knowledge/retriever.ts`): `retrieveRelevantKnowledge({clientId,
+  campaignId?, query, limit})` → relevante Chunks, Dokumentreferenzen,
+  Relevanzwert. **Hybrid-Architektur**: Keyword-Suche läuft sofort; Semantic
+  Search wird zugeschaltet, sobald ein Embedding-Provider konfiguriert ist
+  (`lib/knowledge/embeddings.ts`: OpenAI / Voyage / lokal; Default aus →
+  Keyword-only). Für Skalierung kann `KnowledgeChunk.embedding` auf **pgvector**
+  umgestellt werden.
+- **Pflichtschritt vor jeder Agentenausführung**: Die Agenten-Actions rufen
+  zuerst `gatherKnowledge(...)` ab und übergeben die Chunks an den Agenten.
+- **Quellenreferenzen**: Jeder Agent gibt `sourceReferences`
+  (`{ documentId, chunkId, sourceType, shortExcerpt }`) und `missingInfo` zurück.
+  Die genutzten Quellen werden in **`KnowledgeSourceRef`** gespeichert und in der
+  UI pro Themenidee, Pitch, Briefing, Artikel und Follow-up angezeigt
+  („Verwendete Quellen").
+- **Fehlende Informationen**: Findet der Retriever nichts Belastbares, markiert
+  der Agent dies (`missingInfo`) und erfindet keine Fakten.
+- **Faktenkontrolle**: Knowledge-Dokumente fließen in den Evidence-Korpus von
+  `FactSafetyCheck` / `EditorialChecklist` / `ArticleQualityEngine` ein – als
+  Fakt formulierte Aussagen sind so auf gespeicherte Quellen rückführbar.
+- **Kundenseite → Tab „Wissensquellen"**: Dokumente, Herkunft, Upload-Datum,
+  Anzahl Chunks, Status.
+- Alle Dokumente, Chunks und Referenzen sind strikt nach `organizationId`
+  getrennt.
 
 ## Schreibregel-, Qualitäts- & Faktencheck-Engine
 
@@ -363,6 +403,7 @@ src/
     ai/                # AI-Layer: provider/, agents/, prompts.ts, knowledge/
     writing/           # Schreibregel-Engine (rules, analyzer, rewrite, …)
     quality/           # Fact-/Claim-/AI-Pattern-/Editorial-Checks + Report-Store
+    knowledge/         # Knowledge Retrieval (chunker, retriever, embeddings, ingest, sources)
   actions/             # Server Actions (CRUD, Auth, Import, Workflow)
   components/           # UI-Bausteine (ui, delete-button, action-button, sidebar)
   app/

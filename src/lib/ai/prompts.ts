@@ -31,7 +31,16 @@ function buildJsonPrompt(params: {
         `redaktionell statt werblich. Vermeide KI-Floskeln, Gedankenstriche als ` +
         `Stilmittel, Dreier-Adjektivketten und generische Fazits. Aktiv statt ` +
         `passiv, ein Gedanke pro Satz.\n` +
-        `Antworte ausschließlich mit gültigem JSON in genau dieser Form (keine Erklärungen, kein Markdown):\n` +
+        // Knowledge retrieval contract: use the provided sources, cite them,
+        // and flag missing information instead of inventing facts.
+        `Nutze die bereitgestellten Wissens-Chunks (Feld "sources" der ` +
+        `Eingabe) als Faktenbasis. Gib zusätzlich zwei Felder zurück: ` +
+        `"sourceReferences" (Array aus {documentId, chunkId, sourceType, ` +
+        `shortExcerpt} der tatsächlich genutzten Chunks) und "missingInfo" ` +
+        `(Array von Strings für fehlende, aber benötigte Informationen). ` +
+        `Reichen die Quellen nicht, fülle "missingInfo" und erfinde nichts.\n` +
+        `Antworte ausschließlich mit gültigem JSON in genau dieser Form ` +
+        `(plus sourceReferences und missingInfo; keine Erklärungen, kein Markdown):\n` +
         `${params.outputShape}`,
     },
     {

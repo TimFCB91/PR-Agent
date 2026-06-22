@@ -8,6 +8,7 @@ import { writeAccess } from "@/lib/action-helpers";
 import { rawInputSchema } from "@/lib/validations";
 import { fieldErrorsFromZod, type FormState } from "@/lib/form";
 import { processRawInput } from "@/lib/intake/intakeProcessor";
+import { ingestDocument } from "@/lib/knowledge/ingest";
 
 function rev(clientId: string) {
   revalidatePath(`/dashboard/clients/${clientId}`);
@@ -33,14 +34,29 @@ export async function createRawInputAction(
     return { ok: false, fieldErrors: fieldErrorsFromZod(parsed.error) };
   }
 
-  await prisma.clientRawInput.create({
+  const rawInput = await prisma.clientRawInput.create({
     data: {
       ...parsed.data,
       clientId,
       organizationId: tenant.organizationId,
       createdById: tenant.userId,
     },
+    select: { id: true, title: true, rawText: true, sourceType: true, fileName: true },
   });
+
+  // Build a durable, searchable KnowledgeDocument + chunks from the raw input.
+  // The original raw input is preserved.
+  if (rawInput.rawText && rawInput.rawText.trim()) {
+    await ingestDocument({
+      organizationId: tenant.organizationId,
+      clientId,
+      rawInputId: rawInput.id,
+      title: rawInput.title,
+      sourceType: rawInput.sourceType,
+      sourceName: rawInput.fileName,
+      content: rawInput.rawText,
+    });
+  }
 
   rev(clientId);
   return { ok: true };

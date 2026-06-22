@@ -13,6 +13,7 @@ import {
 import { DeleteButton } from "@/components/delete-button";
 import { ActionButton } from "@/components/action-button";
 import { QualityPanel } from "@/components/quality-panel";
+import { KnowledgeSources } from "@/components/knowledge-sources";
 
 import {
   createRawInputAction,
@@ -66,6 +67,7 @@ const TABS = [
   { key: "insights", label: "Erkenntnisse" },
   { key: "knowledge", label: "Wissen" },
   { key: "graph", label: "Wissensgraph" },
+  { key: "documents", label: "Wissensquellen" },
   { key: "topics", label: "Themen" },
   { key: "contacts", label: "Medienkontakte" },
   { key: "outreach", label: "Outreach" },
@@ -158,6 +160,9 @@ export default async function ClientDetailPage({
       )}
       {activeTab === "graph" && (
         <GraphTab clientId={id} organizationId={organizationId} />
+      )}
+      {activeTab === "documents" && (
+        <DocumentsTab clientId={id} organizationId={organizationId} />
       )}
       {activeTab === "topics" && (
         <TopicsTab
@@ -597,6 +602,70 @@ async function GraphTab({
 
 // ---------------------------------------------------------------------------
 
+async function DocumentsTab({
+  clientId,
+  organizationId,
+}: {
+  clientId: string;
+  organizationId: string;
+}) {
+  const items = await prisma.knowledgeDocument.findMany({
+    where: { clientId, organizationId },
+    orderBy: { createdAt: "desc" },
+    include: { _count: { select: { chunks: true } } },
+  });
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500">
+        Dauerhaft gespeicherte, durchsuchbare Wissensquellen — automatisch beim
+        Anlegen von Rohinformationen erzeugt.
+      </p>
+
+      {items.length === 0 ? (
+        <EmptyState message="Noch keine Wissensquellen. Lege eine Rohinformation mit Text an — daraus wird automatisch ein durchsuchbares Dokument." />
+      ) : (
+        <Card className="overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="border-b border-gray-200 bg-gray-50 text-left">
+              <tr>
+                <th className={th}>Titel</th>
+                <th className={th}>Quelle/Typ</th>
+                <th className={th}>Herkunft</th>
+                <th className={th}>Hochgeladen</th>
+                <th className={th}>Chunks</th>
+                <th className={th}>Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {items.map((d) => (
+                <tr key={d.id} className="hover:bg-gray-50">
+                  <td className="px-5 py-3 font-medium text-gray-900">
+                    {d.title}
+                  </td>
+                  <td className={td}>
+                    <Badge value={d.sourceType} />
+                  </td>
+                  <td className={td}>{d.sourceName ?? "—"}</td>
+                  <td className={td}>
+                    {d.createdAt.toLocaleDateString("de-DE")}
+                  </td>
+                  <td className={td}>{d._count.chunks}</td>
+                  <td className={td}>
+                    <Badge value={d.status} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
 async function TopicsTab({
   clientId,
   organizationId,
@@ -701,6 +770,20 @@ async function TopicsTab({
             </tbody>
           </table>
         </Card>
+      )}
+
+      {items.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {items.map((t) => (
+            <div key={t.id}>
+              <KnowledgeSources
+                entityType="TOPIC"
+                entityId={t.id}
+                organizationId={organizationId}
+              />
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -926,6 +1009,7 @@ async function BriefingsTab({
           <div key={b.id}>
             <p className="text-sm font-medium text-gray-700">{b.title}</p>
             <QualityPanel entityType="BRIEFING" entityId={b.id} clientId={clientId} organizationId={organizationId} writable={writable} />
+            <KnowledgeSources entityType="BRIEFING" entityId={b.id} organizationId={organizationId} />
           </div>
         ))}
       </div>
@@ -1046,6 +1130,7 @@ async function ArticlesTab({
           <div key={a.id}>
             <p className="text-sm font-medium text-gray-700">{a.title}</p>
             <QualityPanel entityType="ARTICLE" entityId={a.id} clientId={clientId} organizationId={organizationId} writable={writable} />
+            <KnowledgeSources entityType="ARTICLE" entityId={a.id} organizationId={organizationId} />
           </div>
         ))}
       </div>

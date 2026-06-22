@@ -3,6 +3,12 @@ import { z } from "zod";
 import { PROMPTS } from "@/lib/ai/prompts";
 import { generatePitchEmail } from "@/lib/outreach/outreachManager";
 import { runAgent, type AgentContext, type AgentDefinition } from "@/lib/ai/agents/runAgent";
+import {
+  knowledgeChunkInput,
+  sourceReferenceOutput,
+  referencesFromChunks,
+  missingInfoFor,
+} from "@/lib/ai/agents/knowledgeContext";
 
 export const pitchInputSchema = z.object({
   clientName: z.string(),
@@ -10,12 +16,15 @@ export const pitchInputSchema = z.object({
   mediaAngle: z.string().nullish(),
   contactFirstName: z.string().nullish(),
   contactOutlet: z.string().nullish(),
+  sources: z.array(knowledgeChunkInput),
 });
 
 export const pitchOutputSchema = z.object({
   subject: z.string(),
   pitchEmail: z.string(),
   reasoning: z.string(),
+  sourceReferences: z.array(sourceReferenceOutput),
+  missingInfo: z.array(z.string()),
 });
 
 export type PitchAgentInput = z.infer<typeof pitchInputSchema>;
@@ -38,6 +47,8 @@ const definition: AgentDefinition<PitchAgentInput, PitchAgentOutput> = {
       contactOutlet: input.contactOutlet,
     }),
     reasoning: "Mock-Pitch auf Basis von Thema und Medienkontakt.",
+    sourceReferences: referencesFromChunks(input.sources),
+    missingInfo: missingInfoFor(input.sources, input.topicTitle ?? input.clientName),
   }),
 };
 
