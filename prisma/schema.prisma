@@ -1,0 +1,150 @@
+// Prisma schema for the PR-Agent SaaS foundation.
+// Multi-tenant: every tenant-owned record carries an organizationId.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// Enums
+// ----------------------------------------------------------------------------
+
+enum Role {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum OutreachStatus {
+  PLANNED
+  SENT
+  REPLIED
+  DECLINED
+}
+
+// ----------------------------------------------------------------------------
+// Tenancy
+// ----------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  clients       Client[]
+  campaigns     Campaign[]
+  mediaContacts MediaContact[]
+  outreaches    Outreach[]
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String
+  passwordHash   String
+  role           Role     @default(VIEWER)
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// ----------------------------------------------------------------------------
+// Domain models — all scoped by organizationId
+// ----------------------------------------------------------------------------
+
+model Client {
+  id             String   @id @default(cuid())
+  name           String
+  contactEmail   String?
+  contactPhone   String?
+  website        String?
+  notes          String?
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaigns    Campaign[]
+
+  @@index([organizationId])
+}
+
+model Campaign {
+  id             String         @id @default(cuid())
+  name           String
+  description    String?
+  status         CampaignStatus @default(DRAFT)
+  startDate      DateTime?
+  endDate        DateTime?
+  clientId       String
+  organizationId String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  outreaches   Outreach[]
+
+  @@index([organizationId])
+  @@index([clientId])
+}
+
+model MediaContact {
+  id             String   @id @default(cuid())
+  firstName      String
+  lastName       String
+  email          String
+  phone          String?
+  outlet         String?
+  beat           String?
+  notes          String?
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  outreaches   Outreach[]
+
+  @@index([organizationId])
+}
+
+model Outreach {
+  id             String         @id @default(cuid())
+  subject        String
+  message        String?
+  status         OutreachStatus @default(PLANNED)
+  sentAt         DateTime?
+  campaignId     String
+  mediaContactId String
+  organizationId String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  mediaContact MediaContact @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([campaignId])
+  @@index([mediaContactId])
+}

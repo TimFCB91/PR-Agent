@@ -1,0 +1,47 @@
+import { notFound, redirect } from "next/navigation";
+
+import { prisma } from "@/lib/prisma";
+import { requireTenant, canWrite } from "@/lib/tenant";
+import { updateOutreachAction } from "@/actions/outreach";
+import { PageHeader } from "@/components/ui";
+import { OutreachForm } from "../../outreach-form";
+
+export default async function EditOutreachPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const { organizationId, role } = await requireTenant();
+  if (!canWrite(role)) redirect("/dashboard/outreach");
+
+  const [outreach, campaigns, contacts] = await Promise.all([
+    prisma.outreach.findFirst({ where: { id, organizationId } }),
+    prisma.campaign.findMany({
+      where: { organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.mediaContact.findMany({
+      where: { organizationId },
+      orderBy: { lastName: "asc" },
+      select: { id: true, firstName: true, lastName: true },
+    }),
+  ]);
+  if (!outreach) notFound();
+
+  const action = updateOutreachAction.bind(null, outreach.id);
+
+  return (
+    <div>
+      <PageHeader title="Outreach bearbeiten" />
+      <OutreachForm
+        action={action}
+        campaigns={campaigns}
+        contacts={contacts}
+        defaults={outreach}
+        submitLabel="Speichern"
+      />
+    </div>
+  );
+}
