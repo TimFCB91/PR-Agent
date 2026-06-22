@@ -61,6 +61,38 @@ enum InteractionResult {
   PUBLISHED
 }
 
+enum MediaSourceType {
+  MANUAL
+  CSV
+  EXCEL
+  ZIMPEL
+  INTERNET_RESEARCH
+  API
+  OTHER
+}
+
+enum ImportStatus {
+  UPLOADED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  SOURCE_VERIFIED
+  MANUALLY_VERIFIED
+  OUTDATED
+}
+
+enum ResearchStatus {
+  SUGGESTED
+  REVIEWED
+  IMPORTED
+  REJECTED
+  DUPLICATE
+}
+
 enum OutreachStatus {
   DRAFT
   READY
@@ -208,6 +240,8 @@ model Organization {
   mediaPerformances  MediaPerformance[]
   mediaInteractions  MediaInteraction[]
   journalistPreferences JournalistPreference[]
+  mediaImportSessions   MediaImportSession[]
+  mediaResearchResults  MediaResearchResult[]
 }
 
 model User {
@@ -291,7 +325,7 @@ model MediaContact {
   id             String   @id @default(cuid())
   firstName      String
   lastName       String
-  email          String
+  email          String?
   phone          String?
   outlet         String?
   beat           String?
@@ -305,6 +339,13 @@ model MediaContact {
   preferredAngles       String[] @default([])
   avoidedTopics         String[] @default([])
   notesFromInteractions String?
+  // Provenance — how the contact entered the system.
+  sourceType         MediaSourceType    @default(MANUAL)
+  sourceImportId     String?
+  sourceUrls         String[]           @default([])
+  importedAt         DateTime?
+  verifiedAt         DateTime?
+  verificationStatus VerificationStatus @default(UNVERIFIED)
   organizationId String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -802,4 +843,57 @@ model JournalistPreference {
   mediaContact MediaContact @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
+}
+
+// ----------------------------------------------------------------------------
+// Media data import & internet research (feeds the SAME MediaContact model)
+// ----------------------------------------------------------------------------
+
+// One import run (CSV / Excel / Zimpel / research). Contacts reference it.
+model MediaImportSession {
+  id               String          @id @default(cuid())
+  sourceType       MediaSourceType
+  importedByUserId String?
+  fileName         String?
+  importedRecords  Int             @default(0)
+  validRecords     Int             @default(0)
+  invalidRecords   Int             @default(0)
+  status           ImportStatus    @default(UPLOADED)
+  notes            String?
+  organizationId   String
+  createdAt        DateTime        @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// A researched media suggestion. NEVER auto-imported — needs manual approval.
+model MediaResearchResult {
+  id             String         @id @default(cuid())
+  mediumName     String
+  website        String?
+  mediaType      String?
+  section        String?
+  region         String?
+  contactName    String?
+  contactRole    String?
+  email          String?
+  contactPageUrl String?
+  sourceUrls     String[]       @default([])
+  relevanceReason String?
+  suggestedAngle String?
+  confidence     Int            @default(0)
+  status         ResearchStatus @default(SUGGESTED)
+  clientId       String
+  campaignId     String?
+  topicIdeaId    String?
+  organizationId String
+  createdAt      DateTime       @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([campaignId])
 }

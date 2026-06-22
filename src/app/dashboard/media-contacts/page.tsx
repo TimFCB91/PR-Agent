@@ -5,7 +5,7 @@ import { requireTenant, canWrite } from "@/lib/tenant";
 import { deleteMediaContactAction } from "@/actions/media-contacts";
 import { DeleteButton } from "@/components/delete-button";
 import { Card, PageHeader, LinkButton, EmptyState } from "@/components/ui";
-import { ImportForm } from "./import-form";
+import { FileImportForm } from "./file-import-form";
 
 export default async function MediaContactsPage() {
   const { organizationId, role } = await requireTenant();
@@ -41,7 +41,7 @@ export default async function MediaContactsPage() {
 
       {writable && (
         <div className="mb-6">
-          <ImportForm />
+          <FileImportForm />
         </div>
       )}
 

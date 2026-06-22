@@ -8,8 +8,13 @@ import {
   getOrgMediaIntelligenceSummary,
 } from "@/lib/media/mediaIntelligence";
 import { toggleCampaignShareAction } from "@/actions/campaigns";
+import {
+  researchMediaAction,
+  approveResearchResultAction,
+  rejectResearchResultAction,
+} from "@/actions/media-research";
 import { ActionButton } from "@/components/action-button";
-import { Card, PageHeader, LinkButton } from "@/components/ui";
+import { Card, PageHeader, LinkButton, EmptyState, Badge } from "@/components/ui";
 
 export default async function CampaignDashboardPage({
   params,
@@ -30,6 +35,15 @@ export default async function CampaignDashboardPage({
   const report = await getCampaignReport(campaign.id, organizationId);
   const mi = await getCampaignMediaIntelligence(campaign.id, organizationId);
   const summary = await getOrgMediaIntelligenceSummary(organizationId);
+
+  const research = await prisma.mediaResearchResult.findMany({
+    where: {
+      campaignId: campaign.id,
+      organizationId,
+      status: { in: ["SUGGESTED", "REVIEWED", "DUPLICATE"] },
+    },
+    orderBy: { confidence: "desc" },
+  });
 
   const stats = [
     { label: "Themen", value: report.topics },
@@ -214,6 +228,128 @@ export default async function CampaignDashboardPage({
                 <li key={i}>{line}</li>
               ))}
             </ul>
+          </div>
+        )}
+      </Card>
+
+      <h2 className="mt-8 mb-3 text-lg font-semibold text-gray-900">
+        Passende Medien recherchieren
+      </h2>
+      <Card className="space-y-4 p-5">
+        {writable && (
+          <div className="space-y-2">
+            <ActionButton
+              action={researchMediaAction}
+              fields={{ campaignId: campaign.id }}
+              label="Passende Medien recherchieren"
+              variant="primary"
+            />
+            <p className="text-xs text-gray-500">
+              Vorschläge auf Basis öffentlicher Quellen. Werden nie automatisch
+              übernommen — manuelle Freigabe nötig.
+            </p>
+          </div>
+        )}
+
+        {research.length === 0 ? (
+          <EmptyState message="Noch keine recherchierten Vorschläge." />
+        ) : (
+          <div className="space-y-3">
+            {research.map((r) => (
+              <div key={r.id} className="rounded-md border border-gray-200 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-gray-900">
+                    {r.mediumName}
+                  </span>
+                  <Badge value={r.status} />
+                  <span className="text-xs text-gray-500">
+                    Confidence {r.confidence}%
+                  </span>
+                </div>
+
+                <dl className="mt-2 space-y-1 text-sm text-gray-700">
+                  <div>
+                    <span className="text-gray-500">Medientyp:</span>{" "}
+                    {r.mediaType ?? "—"}
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Ressort:</span>{" "}
+                    {r.section ?? "—"}
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Region:</span>{" "}
+                    {r.region ?? "—"}
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Relevanz:</span>{" "}
+                    {r.relevanceReason ?? "—"}
+                  </div>
+                  <div>
+                    <span className="text-gray-500">
+                      Vorgeschlagener Winkel:
+                    </span>{" "}
+                    {r.suggestedAngle ?? "—"}
+                  </div>
+                  {r.contactName && (
+                    <div>
+                      <span className="text-gray-500">Kontakt:</span>{" "}
+                      {r.contactName}
+                      {r.contactRole ? ` (${r.contactRole})` : ""}
+                    </div>
+                  )}
+                  {r.email && (
+                    <div>
+                      <span className="text-gray-500">E-Mail:</span> {r.email}
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-gray-500">Quellen:</span>{" "}
+                    {r.sourceUrls.length > 0 ? (
+                      <span className="inline-flex flex-wrap gap-2">
+                        {r.sourceUrls.map((url, i) => (
+                          <a
+                            key={i}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 underline"
+                          >
+                            {url}
+                          </a>
+                        ))}
+                      </span>
+                    ) : (
+                      "Keine Quelle hinterlegt — vor Übernahme prüfen."
+                    )}
+                  </div>
+                </dl>
+
+                {writable &&
+                  (r.status === "SUGGESTED" || r.status === "REVIEWED") && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <ActionButton
+                        action={approveResearchResultAction}
+                        fields={{ id: r.id }}
+                        label="Übernehmen"
+                        variant="primary"
+                      />
+                      <ActionButton
+                        action={rejectResearchResultAction}
+                        fields={{ id: r.id }}
+                        label="Ablehnen"
+                        variant="danger"
+                        confirmText="Vorschlag ablehnen?"
+                      />
+                    </div>
+                  )}
+
+                {r.status === "DUPLICATE" && (
+                  <p className="mt-3 text-xs text-gray-500">
+                    Bereits als Kontakt vorhanden.
+                  </p>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </Card>

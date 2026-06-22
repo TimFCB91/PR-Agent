@@ -343,6 +343,52 @@ async function main() {
     ],
   });
 
+  // ---- Media import & research demo (provenance) ----
+  await prisma.mediaImportSession.create({
+    data: {
+      organizationId: acme.id,
+      sourceType: "ZIMPEL",
+      importedByUserId: acmeOwner.id,
+      fileName: "zimpel-export-mobilitaet.csv",
+      importedRecords: 3,
+      validRecords: 3,
+      invalidRecords: 0,
+      status: "COMPLETED",
+      notes: "3 neu, 0 aktualisiert, 0 übersprungen",
+    },
+  });
+
+  await prisma.mediaResearchResult.createMany({
+    data: [
+      {
+        organizationId: acme.id,
+        clientId: acmeClientA.id,
+        campaignId: acmeCampaign.id,
+        topicIdeaId: acmeTopic.id,
+        mediumName: "Fachmagazin zu „E-Mobilität in Städten“ (recherchieren)",
+        mediaType: "Fachpresse",
+        section: "Mobilität",
+        relevanceReason: "Passt thematisch zu E-Mobilität. Vorschlag zur manuellen Prüfung.",
+        suggestedAngle: "Einordnung von E-Mobilität in Städten",
+        confidence: 45,
+        status: "SUGGESTED",
+      },
+      {
+        organizationId: acme.id,
+        clientId: acmeClientA.id,
+        campaignId: acmeCampaign.id,
+        topicIdeaId: acmeTopic.id,
+        mediumName: "Regionalzeitung zu „E-Mobilität in Städten“ (recherchieren)",
+        mediaType: "Regionalmedium",
+        section: "Lokales",
+        relevanceReason: "Regionaler Bezug zur Verkehrswende. Vorschlag zur manuellen Prüfung.",
+        suggestedAngle: "Lokale Verkehrswende",
+        confidence: 40,
+        status: "SUGGESTED",
+      },
+    ],
+  });
+
   // Reference the raw input + insight so unused-var checks stay clean.
   void acmeRaw;
   void acmeInsight;

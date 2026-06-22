@@ -18,7 +18,7 @@ type Action = (prev: FormState, formData: FormData) => Promise<FormState>;
 export interface MediaContactFormValues {
   firstName?: string;
   lastName?: string;
-  email?: string;
+  email?: string | null;
   phone?: string | null;
   outlet?: string | null;
   beat?: string | null;

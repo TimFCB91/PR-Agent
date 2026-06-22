@@ -92,6 +92,8 @@ Rohinformation  →  Erkenntnis  →  Themenidee  →  Briefing  →  Artikelent
 | `MediaPerformance`  | Aggregierte Kennzahlen je Medienkontakt             | `organizationId` |
 | `MediaInteraction`  | Geloggte Interaktion (Lernsignal)                   | `organizationId` |
 | `JournalistPreference` | Abgeleitete Vorlieben je Journalist:in           | `organizationId` |
+| `MediaImportSession` | Protokoll eines Imports (CSV/Excel/Zimpel)          | `organizationId` |
+| `MediaResearchResult` | Recherchierter Medienvorschlag (Freigabe nötig)    | `organizationId` |
 
 Alle tenant-bezogenen Modelle besitzen eine `organizationId`.
 
@@ -255,6 +257,47 @@ welche Medien, Journalist:innen, Themen und Winkel funktionieren.
   MediaContact-Detailseite (Quoten, letzte Kontakte, Veröffentlichungen,
   bevorzugte Themen/Formate) und der Campaign Report (auch extern).
 - Alle Media-Intelligence-Daten sind strikt nach `organizationId` getrennt.
+
+## Medienkontakte: Anlegen, Import & Recherche
+
+Medienkontakte entstehen auf drei Wegen – danach funktionieren **alle
+identisch** in Matching, Outreach, Reporting und Intelligence (keine
+Insellösung). Provenienz wird auf `MediaContact` gespeichert (`sourceType`,
+`sourceImportId`, `sourceUrls`, `importedAt`, `verifiedAt`,
+`verificationStatus`).
+
+**1. Manuell** – wie bisher über das Formular.
+
+**2. Import** (CSV / Excel / Zimpel) – `lib/media/importers/`:
+- `importMapper.ts` erkennt Spalten automatisch (Medium, Ressort, Vor-/
+  Nachname, Name, E-Mail, Telefon, Website, Region, Land, Themen, Medientyp,
+  Notizen – inkl. deutscher/Zimpel-Labels); nicht erkannte Spalten landen als
+  `metadata` (→ Notizen).
+- `csvImporter.ts`, `excelImporter.ts` (xlsx), `zimpelImporter.ts` (erkennt
+  typische Zimpel-Exporte als CSV/Excel – keine Zimpel-API nötig).
+- `importValidator.ts` validiert je Datensatz und erkennt **Dubletten**
+  (gleiche E-Mail · Name+Medium · Website · Medienname) mit Optionen
+  **überspringen / aktualisieren / neu anlegen**.
+- Jeder Lauf wird als **`MediaImportSession`** protokolliert (Quelle, Datei,
+  Anzahl gültig/ungültig, Status). UI: „Kontakte importieren" auf der
+  Medienkontakte-Seite.
+
+**3. Internetrecherche** – `lib/media/mediaResearchAgent.ts` +
+`mediaResearchProvider.ts` + `mediaResearchValidator.ts`:
+- Input: Kunde, Kampagne, Themenidee, Branche, Zielgruppe, Region, Medientyp.
+- Output je Vorschlag: Medium, Website, Medientyp, Ressort, Region,
+  Ansprechpartner/Rolle (nur mit Quelle), Kontaktseite, E-Mail (nur öffentlich
+  belegt), **Quellen**, Relevanzbegründung, vorgeschlagener Winkel, Confidence.
+- **Compliance** (im `mediaResearchValidator`): keine erfundenen Personen, keine
+  geratenen E-Mails, keine Daten ohne Quelle – nur öffentlich Zugängliches. Der
+  Default-Provider ist ein **Mock** (keine Netzzugriffe); ein Live-Provider
+  (LLM + Websuche über öffentliche Quellen) ist über dieselbe Schnittstelle
+  vorbereitet.
+- Ergebnisse werden als **`MediaResearchResult`** (Status `suggested`)
+  gespeichert und **nie automatisch übernommen**: Auf dem Campaign-Dashboard
+  („Passende Medien recherchieren") sieht der Nutzer Vorschlag, Quellen,
+  Relevanz und Winkel und übernimmt (→ `MediaContact` mit `internet_research`-
+  Provenienz) oder lehnt ab.
 
 ## Schreibregel-, Qualitäts- & Faktencheck-Engine
 
@@ -443,7 +486,7 @@ src/
     writing/           # Schreibregel-Engine (rules, analyzer, rewrite, …)
     quality/           # Fact-/Claim-/AI-Pattern-/Editorial-Checks + Report-Store
     knowledge/         # Knowledge Retrieval (chunker, retriever, embeddings, ingest, sources)
-    media/             # Media Intelligence (performanceCalculator, mediaIntelligence)
+    media/             # Media Intelligence + importers/ (csv/excel/zimpel) + research (provider/agent/validator)
   actions/             # Server Actions (CRUD, Auth, Import, Workflow)
   components/           # UI-Bausteine (ui, delete-button, action-button, sidebar)
   app/
