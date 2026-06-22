@@ -11,7 +11,7 @@ export default async function ClientsPage() {
   const writable = canWrite(role);
 
   const clients = await prisma.client.findMany({
-    where: { organizationId },
+    where: { organizationId, isTopicPool: false },
     orderBy: { createdAt: "desc" },
     include: { _count: { select: { campaigns: true } } },
   });

@@ -18,7 +18,7 @@ export default async function EditCampaignPage({
   const [campaign, clients] = await Promise.all([
     prisma.campaign.findFirst({ where: { id, organizationId } }),
     prisma.client.findMany({
-      where: { organizationId },
+      where: { organizationId, isTopicPool: false },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),

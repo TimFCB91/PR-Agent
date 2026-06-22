@@ -295,6 +295,10 @@ model Client {
   contactPhone   String?
   website        String?
   notes          String?
+  // Internal topic pool: a special "client" that only holds imported pool
+  // topics (e.g. from Trello). Excluded from the normal client list and from
+  // matching candidates.
+  isTopicPool    Boolean  @default(false)
   organizationId String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

@@ -7,7 +7,7 @@ export default async function DashboardPage() {
 
   const [clients, campaigns, mediaContacts, outreaches, recentOutreach] =
     await Promise.all([
-      prisma.client.count({ where: { organizationId } }),
+      prisma.client.count({ where: { organizationId, isTopicPool: false } }),
       prisma.campaign.count({ where: { organizationId } }),
       prisma.mediaContact.count({ where: { organizationId } }),
       prisma.outreach.count({ where: { organizationId } }),

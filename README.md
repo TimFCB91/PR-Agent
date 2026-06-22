@@ -44,6 +44,12 @@ Briefings und Artikelentwürfe bis zu Outreach, Veröffentlichungen und Reportin
   starkes Thema für mehrere Kunden zu nutzen. Rein keyword-/wissensbasiert –
   nur reale Überschneidungen, keine erfundenen Bezüge
   (`lib/matching/topicClientMatcher.ts`).
+- **Themenpool mit Trello-Import**: Eigener Bereich „Themenpool" – ein Trello-
+  Board als **JSON** hochladen, jede offene Karte wird zu einem Pool-Thema.
+  Je Pool-Thema werden die best-passenden Kunden angezeigt; umgekehrt hat jeder
+  Kunde einen Tab **„Pool-Themen"** mit den für ihn passendsten Themen. Der Pool
+  ist ein interner, nicht browsebarer Sammel-„Kunde" (`isTopicPool`), aus dem
+  Client-Listen und Matching-Kandidaten ausgeschlossen.
 - **Operative Follow-up-Steuerung**:
   - Tagesliste **„Fällige Follow-ups"** (eigener Menüpunkt) – zeigt nur
     Kontakte mit Handlungsbedarf (Erstmail raus, keine Antwort, Datum erreicht,

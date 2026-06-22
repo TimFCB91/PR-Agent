@@ -16,11 +16,11 @@ import { ActionButton } from "@/components/action-button";
 import { QualityPanel } from "@/components/quality-panel";
 import { KnowledgeSources } from "@/components/knowledge-sources";
 import {
-  buildClientProfile,
   matchClientsToTopic,
-  type ClientProfile,
   type TopicMatch,
 } from "@/lib/matching/topicClientMatcher";
+import { loadClientProfiles } from "@/lib/matching/clientProfiles";
+import { findTopicPool } from "@/lib/topics/topicPool";
 
 import {
   createRawInputAction,
@@ -81,6 +81,7 @@ const TABS = [
   { key: "graph", label: "Wissensgraph" },
   { key: "documents", label: "Wissensquellen" },
   { key: "topics", label: "Themen" },
+  { key: "poolmatch", label: "Pool-Themen" },
   { key: "contacts", label: "Medienkontakte" },
   { key: "outreach", label: "Outreach" },
   { key: "briefings", label: "Briefings" },
@@ -182,6 +183,9 @@ export default async function ClientDetailPage({
           organizationId={organizationId}
           writable={writable}
         />
+      )}
+      {activeTab === "poolmatch" && (
+        <PoolMatchTab clientId={id} organizationId={organizationId} />
       )}
       {activeTab === "contacts" && (
         <ContactsTab organizationId={organizationId} />
@@ -713,7 +717,7 @@ async function TopicsTab({
   organizationId: string;
   writable: boolean;
 }) {
-  const [items, campaigns, allClients, knowledge, insights] = await Promise.all([
+  const [items, campaigns, profiles] = await Promise.all([
     prisma.topicIdea.findMany({
       where: { clientId, organizationId },
       orderBy: { createdAt: "desc" },
@@ -723,43 +727,8 @@ async function TopicsTab({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
-    // Org-wide clients + their knowledge → matching profiles (loaded once).
-    prisma.client.findMany({
-      where: { organizationId },
-      select: { id: true, name: true, notes: true },
-    }),
-    prisma.clientKnowledge.findMany({
-      where: { organizationId },
-      select: { clientId: true, title: true, content: true, confidence: true },
-    }),
-    prisma.clientInsight.findMany({
-      where: { organizationId, status: "APPROVED" },
-      select: { clientId: true, title: true, content: true, confidence: true },
-    }),
+    loadClientProfiles(organizationId),
   ]);
-
-  // Build one weighted term profile per client, then match each topic to them.
-  const bitsByClient = new Map<
-    string,
-    Array<{ text: string; confidence?: number | null }>
-  >();
-  const pushBit = (cid: string, text: string | null, conf?: number | null) => {
-    if (!text) return;
-    const arr = bitsByClient.get(cid) ?? [];
-    arr.push({ text, confidence: conf });
-    bitsByClient.set(cid, arr);
-  };
-  for (const k of knowledge) pushBit(k.clientId, `${k.title} ${k.content ?? ""}`, k.confidence);
-  for (const i of insights) pushBit(i.clientId, `${i.title} ${i.content ?? ""}`, i.confidence);
-  for (const c of allClients) pushBit(c.id, c.notes ?? null, 40);
-
-  const profiles: ClientProfile[] = allClients.map((c) =>
-    buildClientProfile({
-      id: c.id,
-      name: c.name,
-      bits: bitsByClient.get(c.id) ?? [],
-    }),
-  );
 
   const matchesByTopic = new Map<string, TopicMatch[]>();
   for (const t of items) {
@@ -940,6 +909,91 @@ async function TopicsTab({
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+async function PoolMatchTab({
+  clientId,
+  organizationId,
+}: {
+  clientId: string;
+  organizationId: string;
+}) {
+  const pool = await findTopicPool(organizationId);
+
+  const [poolTopics, profiles] = await Promise.all([
+    pool
+      ? prisma.topicIdea.findMany({
+          where: { clientId: pool.id, organizationId },
+          orderBy: { createdAt: "desc" },
+        })
+      : Promise.resolve([]),
+    loadClientProfiles(organizationId),
+  ]);
+
+  const profile = profiles.find((p) => p.id === clientId);
+
+  // Score every pool topic against THIS client; keep the relevant ones.
+  const ranked = poolTopics
+    .map((t) => {
+      const text = [t.title, t.description].filter(Boolean).join(" ");
+      const m = profile ? matchClientsToTopic(text, [profile])[0] : undefined;
+      return {
+        id: t.id,
+        title: t.title,
+        score: m?.score ?? 0,
+        matchedTerms: m?.matchedTerms ?? [],
+      };
+    })
+    .filter((r) => r.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 15);
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500">
+        Themen aus dem{" "}
+        <Link href="/dashboard/themenpool" className="underline">
+          Themenpool
+        </Link>
+        , die besonders gut zu diesem Kunden passen (auf Basis seines Wissens).
+      </p>
+
+      {poolTopics.length === 0 ? (
+        <EmptyState message="Der Themenpool ist leer. Importiere zuerst Themen (Menü → Themenpool)." />
+      ) : ranked.length === 0 ? (
+        <EmptyState message="Keine Pool-Themen passen klar zu diesem Kunden. Tipp: mehr Wissen beim Kunden hinterlegen." />
+      ) : (
+        <Card className="overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="border-b border-gray-200 bg-gray-50 text-left">
+              <tr>
+                <th className={th}>Passung</th>
+                <th className={th}>Thema</th>
+                <th className={th}>Treffer</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {ranked.map((r) => (
+                <tr key={r.id} className="hover:bg-gray-50">
+                  <td className={td}>
+                    <Badge value={`${r.score}%`} />
+                  </td>
+                  <td className="px-5 py-3 font-medium text-gray-900">
+                    {r.title}
+                  </td>
+                  <td className={td}>
+                    {r.matchedTerms.length > 0 ? r.matchedTerms.join(", ") : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
       )}
     </div>
   );
