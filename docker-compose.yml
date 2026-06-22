@@ -26,7 +26,9 @@ services:
       DATABASE_URL: "postgresql://postgres:postgres@db:5432/pr_agent?schema=public"
       # Fixed dev secret so no manual setup is needed (do NOT use in production).
       AUTH_SECRET: "docker-dev-secret-please-change-0123456789abcdef"
-      AUTH_URL: "http://localhost:3000"
+      # No fixed AUTH_URL: with AUTH_TRUST_HOST the app derives its URL from the
+      # incoming request, so it works on localhost AND behind the Codespaces
+      # (*.app.github.dev) proxy without any extra configuration.
       AUTH_TRUST_HOST: "true"
       AI_MODE: "mock"
       AI_PROVIDER: "anthropic"
