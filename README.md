@@ -38,6 +38,12 @@ Briefings und Artikelentwürfe bis zu Outreach, Veröffentlichungen und Reportin
   Briefings, Artikel (inkl. Volltext), Pitches/Outreach, Medienkontakte,
   Veröffentlichungen – lässt sich nachträglich über ein „✎ Bearbeiten"-Panel
   anpassen. KI-Vorschläge sind nur Startpunkte, nichts ist fix.
+- **Themen-Matching (Kunden ↔ Thema)**: Pro Themenidee zeigt die App, welche
+  Kunden der Organisation am besten passen (Score + Begründung aus dem
+  Wissens-Layer). Hilft, ein Thema dem richtigen Experten zuzuordnen oder ein
+  starkes Thema für mehrere Kunden zu nutzen. Rein keyword-/wissensbasiert –
+  nur reale Überschneidungen, keine erfundenen Bezüge
+  (`lib/matching/topicClientMatcher.ts`).
 - **Operative Follow-up-Steuerung**:
   - Tagesliste **„Fällige Follow-ups"** (eigener Menüpunkt) – zeigt nur
     Kontakte mit Handlungsbedarf (Erstmail raus, keine Antwort, Datum erreicht,

@@ -15,6 +15,12 @@ import { DeleteButton } from "@/components/delete-button";
 import { ActionButton } from "@/components/action-button";
 import { QualityPanel } from "@/components/quality-panel";
 import { KnowledgeSources } from "@/components/knowledge-sources";
+import {
+  buildClientProfile,
+  matchClientsToTopic,
+  type ClientProfile,
+  type TopicMatch,
+} from "@/lib/matching/topicClientMatcher";
 
 import {
   createRawInputAction,
@@ -707,7 +713,7 @@ async function TopicsTab({
   organizationId: string;
   writable: boolean;
 }) {
-  const [items, campaigns] = await Promise.all([
+  const [items, campaigns, allClients, knowledge, insights] = await Promise.all([
     prisma.topicIdea.findMany({
       where: { clientId, organizationId },
       orderBy: { createdAt: "desc" },
@@ -717,7 +723,51 @@ async function TopicsTab({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
+    // Org-wide clients + their knowledge → matching profiles (loaded once).
+    prisma.client.findMany({
+      where: { organizationId },
+      select: { id: true, name: true, notes: true },
+    }),
+    prisma.clientKnowledge.findMany({
+      where: { organizationId },
+      select: { clientId: true, title: true, content: true, confidence: true },
+    }),
+    prisma.clientInsight.findMany({
+      where: { organizationId, status: "APPROVED" },
+      select: { clientId: true, title: true, content: true, confidence: true },
+    }),
   ]);
+
+  // Build one weighted term profile per client, then match each topic to them.
+  const bitsByClient = new Map<
+    string,
+    Array<{ text: string; confidence?: number | null }>
+  >();
+  const pushBit = (cid: string, text: string | null, conf?: number | null) => {
+    if (!text) return;
+    const arr = bitsByClient.get(cid) ?? [];
+    arr.push({ text, confidence: conf });
+    bitsByClient.set(cid, arr);
+  };
+  for (const k of knowledge) pushBit(k.clientId, `${k.title} ${k.content ?? ""}`, k.confidence);
+  for (const i of insights) pushBit(i.clientId, `${i.title} ${i.content ?? ""}`, i.confidence);
+  for (const c of allClients) pushBit(c.id, c.notes ?? null, 40);
+
+  const profiles: ClientProfile[] = allClients.map((c) =>
+    buildClientProfile({
+      id: c.id,
+      name: c.name,
+      bits: bitsByClient.get(c.id) ?? [],
+    }),
+  );
+
+  const matchesByTopic = new Map<string, TopicMatch[]>();
+  for (const t of items) {
+    const text = [t.title, t.description, t.mediaAngle, t.targetMediaType]
+      .filter(Boolean)
+      .join(" ");
+    matchesByTopic.set(t.id, matchClientsToTopic(text, profiles));
+  }
 
   const action = createTopicAction.bind(null, clientId);
 
@@ -797,6 +847,49 @@ async function TopicsTab({
                           />
                         </div>
                       )}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colSpan={8} className="px-5 pb-2">
+                      <details>
+                        <summary className="cursor-pointer text-sm font-medium text-gray-600">
+                          🎯 Passende Kunden (Themen-Matching)
+                        </summary>
+                        <div className="mt-3 max-w-2xl space-y-2">
+                          {(matchesByTopic.get(it.id) ?? []).map((m) => (
+                            <div
+                              key={m.clientId}
+                              className="flex items-start gap-3 rounded-md border border-gray-100 p-2"
+                            >
+                              <Badge value={`${m.score}%`} />
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {m.clientName}
+                                  {m.clientId === clientId && (
+                                    <span className="ml-2 text-xs text-gray-400">
+                                      (aktueller Kunde)
+                                    </span>
+                                  )}
+                                </p>
+                                {m.matchedTerms.length > 0 ? (
+                                  <p className="text-xs text-gray-500">
+                                    Treffer: {m.matchedTerms.join(", ")}
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-gray-400">
+                                    {m.note ?? "—"}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          <p className="text-xs text-gray-400">
+                            Score = Anteil der Themen-Begriffe, die im Wissen des
+                            Kunden vorkommen (gewichtet nach Konfidenz). Nur reale
+                            Überschneidungen, keine erfundenen Bezüge.
+                          </p>
+                        </div>
+                      </details>
                     </td>
                   </tr>
                   {writable && (
