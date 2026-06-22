@@ -9,6 +9,7 @@ const navItems = [
   { href: "/dashboard/campaigns", label: "Kampagnen" },
   { href: "/dashboard/media-contacts", label: "Medienkontakte" },
   { href: "/dashboard/outreach", label: "Outreach" },
+  { href: "/dashboard/follow-ups", label: "Follow-ups" },
   { href: "/dashboard/settings", label: "Einstellungen" },
 ];
 

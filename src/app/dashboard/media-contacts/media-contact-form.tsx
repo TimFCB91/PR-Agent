@@ -8,6 +8,7 @@ import {
   Input,
   Label,
   Textarea,
+  Select,
   Button,
   LinkButton,
   FieldError,
@@ -23,6 +24,9 @@ export interface MediaContactFormValues {
   outlet?: string | null;
   beat?: string | null;
   notes?: string | null;
+  priority?: string | null;
+  relationship?: string | null;
+  doNotContact?: boolean | null;
 }
 
 export function MediaContactForm({
@@ -104,6 +108,40 @@ export function MediaContactForm({
             defaultValue={defaults?.notes ?? ""}
           />
         </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="priority">Priorität</Label>
+            <Select
+              id="priority"
+              name="priority"
+              defaultValue={defaults?.priority ?? "B"}
+            >
+              <option value="A">A (Top-Kontakt, individuell)</option>
+              <option value="B">B (teilpersonalisiert)</option>
+              <option value="C">C (standardisiert)</option>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="relationship">Beziehung</Label>
+            <Select
+              id="relationship"
+              name="relationship"
+              defaultValue={defaults?.relationship ?? "NORMAL"}
+            >
+              <option value="NORMAL">Normal</option>
+              <option value="GOLD">Goldkontakt</option>
+              <option value="BLACKLIST">Blacklist</option>
+            </Select>
+          </div>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            name="doNotContact"
+            defaultChecked={defaults?.doNotContact ?? false}
+          />
+          Nicht erneut kontaktieren (von Follow-ups ausschließen)
+        </label>
         <div className="flex gap-2">
           <Button type="submit" disabled={pending}>
             {pending ? "Speichern…" : submitLabel}

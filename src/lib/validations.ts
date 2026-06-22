@@ -91,6 +91,12 @@ export const mediaContactSchema = z.object({
   outlet: optionalString,
   beat: optionalString,
   notes: optionalString,
+  priority: z.enum(["A", "B", "C"]).default("B"),
+  relationship: z.enum(["NORMAL", "GOLD", "BLACKLIST"]).default("NORMAL"),
+  doNotContact: z
+    .string()
+    .optional()
+    .transform((v) => v === "on" || v === "true"),
 });
 
 // Outreach -------------------------------------------------------------------
@@ -119,6 +125,11 @@ export const outreachSchema = z.object({
   agreedTopic: optionalString,
   publicationUrl: optionalString,
   internalNotes: optionalString,
+  nextStep: optionalString,
+  channel: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.enum(["ZIMPEL", "GMAIL", "OUTLOOK", "PHONE", "OTHER"]).optional(),
+  ),
   // Media intelligence — captured response signals.
   responseReceivedAt: optionalDate,
   responseType: z.preprocess(

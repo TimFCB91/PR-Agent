@@ -7,14 +7,34 @@ import { Input, Label, Textarea, Select, Button, FieldError } from "@/components
 
 type Action = (prev: FormState, formData: FormData) => Promise<FormState>;
 
+function toDateInput(value?: Date | string | null): string {
+  if (!value) return "";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
+export type PublicationDefaults = {
+  title?: string | null;
+  url?: string | null;
+  publicationDate?: Date | string | null;
+  notes?: string | null;
+  campaignId?: string | null;
+  mediaContactId?: string | null;
+};
+
 export function PublicationForm({
   action,
   campaigns,
   contacts,
+  defaults,
+  submitLabel = "Anlegen",
 }: {
   action: Action;
   campaigns: Array<{ id: string; name: string }>;
   contacts: Array<{ id: string; firstName: string; lastName: string }>;
+  defaults?: PublicationDefaults;
+  submitLabel?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, emptyFormState);
 
@@ -27,27 +47,41 @@ export function PublicationForm({
       )}
       <div>
         <Label htmlFor="title">Titel *</Label>
-        <Input id="title" name="title" required />
+        <Input id="title" name="title" required defaultValue={defaults?.title ?? ""} />
         <FieldError messages={state.fieldErrors?.title} />
       </div>
       <div>
         <Label htmlFor="url">URL</Label>
-        <Input id="url" name="url" />
+        <Input id="url" name="url" defaultValue={defaults?.url ?? ""} />
         <FieldError messages={state.fieldErrors?.url} />
       </div>
       <div>
         <Label htmlFor="publicationDate">Veröffentlichungsdatum</Label>
-        <Input id="publicationDate" name="publicationDate" type="date" />
+        <Input
+          id="publicationDate"
+          name="publicationDate"
+          type="date"
+          defaultValue={toDateInput(defaults?.publicationDate)}
+        />
         <FieldError messages={state.fieldErrors?.publicationDate} />
       </div>
       <div>
         <Label htmlFor="notes">Notizen</Label>
-        <Textarea id="notes" name="notes" rows={3} />
+        <Textarea
+          id="notes"
+          name="notes"
+          rows={3}
+          defaultValue={defaults?.notes ?? ""}
+        />
         <FieldError messages={state.fieldErrors?.notes} />
       </div>
       <div>
         <Label htmlFor="campaignId">Kampagne</Label>
-        <Select id="campaignId" name="campaignId" defaultValue="">
+        <Select
+          id="campaignId"
+          name="campaignId"
+          defaultValue={defaults?.campaignId ?? ""}
+        >
           <option value="">— keine —</option>
           {campaigns.map((c) => (
             <option key={c.id} value={c.id}>
@@ -58,7 +92,11 @@ export function PublicationForm({
       </div>
       <div>
         <Label htmlFor="mediaContactId">Medienkontakt</Label>
-        <Select id="mediaContactId" name="mediaContactId" defaultValue="">
+        <Select
+          id="mediaContactId"
+          name="mediaContactId"
+          defaultValue={defaults?.mediaContactId ?? ""}
+        >
           <option value="">— keine —</option>
           {contacts.map((c) => (
             <option key={c.id} value={c.id}>
@@ -68,7 +106,7 @@ export function PublicationForm({
         </Select>
       </div>
       <Button type="submit" disabled={pending}>
-        {pending ? "Speichern…" : "Anlegen"}
+        {pending ? "Speichern…" : submitLabel}
       </Button>
     </form>
   );

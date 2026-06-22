@@ -115,6 +115,8 @@ async function main() {
         email: "lena.musterfrau@beispiel-magazin.test",
         outlet: "Beispiel Magazin",
         beat: "Mobilität",
+        priority: "A" as const,
+        relationship: "GOLD" as const,
       },
       {
         firstName: "Tom",
@@ -122,6 +124,7 @@ async function main() {
         email: "tom.beispiel@demo-zeitung.test",
         outlet: "Demo Zeitung",
         beat: "Wirtschaft",
+        priority: "A" as const,
       },
       {
         firstName: "Sara",
@@ -129,6 +132,7 @@ async function main() {
         email: "sara.platzhalter@test-blog.test",
         outlet: "Test Blog",
         beat: "Technologie",
+        priority: "C" as const,
       },
     ].map((c) =>
       prisma.mediaContact.create({

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireTenant, canWrite } from "@/lib/tenant";
 import { deleteMediaContactAction } from "@/actions/media-contacts";
 import { DeleteButton } from "@/components/delete-button";
-import { Card, PageHeader, LinkButton, EmptyState } from "@/components/ui";
+import { Card, PageHeader, LinkButton, EmptyState, Badge } from "@/components/ui";
 import { FileImportForm } from "./file-import-form";
 
 export default async function MediaContactsPage() {
@@ -53,6 +53,7 @@ export default async function MediaContactsPage() {
             <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
               <tr>
                 <th className="px-5 py-3 font-medium">Name</th>
+                <th className="px-5 py-3 font-medium">Prio</th>
                 <th className="px-5 py-3 font-medium">E-Mail</th>
                 <th className="px-5 py-3 font-medium">Medium</th>
                 <th className="px-5 py-3 font-medium">Ressort</th>
@@ -69,6 +70,18 @@ export default async function MediaContactsPage() {
                     >
                       {c.firstName} {c.lastName}
                     </Link>
+                    {c.doNotContact && (
+                      <span className="ml-2 text-xs text-red-600">🚫 gesperrt</span>
+                    )}
+                    {c.relationship === "GOLD" && (
+                      <span className="ml-2 text-xs text-amber-600">★ Gold</span>
+                    )}
+                    {c.relationship === "BLACKLIST" && (
+                      <span className="ml-2 text-xs text-red-600">Blacklist</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3">
+                    <Badge value={c.priority} />
                   </td>
                   <td className="px-5 py-3 text-gray-600">{c.email}</td>
                   <td className="px-5 py-3 text-gray-600">{c.outlet ?? "—"}</td>

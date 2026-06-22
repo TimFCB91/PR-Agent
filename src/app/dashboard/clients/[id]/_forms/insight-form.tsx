@@ -22,7 +22,23 @@ const INSIGHT_TYPES = [
 
 const STATUSES = ["DRAFT", "APPROVED", "REJECTED"] as const;
 
-export function InsightForm({ action }: { action: Action }) {
+export type InsightDefaults = {
+  insightType?: string | null;
+  title?: string | null;
+  content?: string | null;
+  confidence?: number | null;
+  status?: string | null;
+};
+
+export function InsightForm({
+  action,
+  defaults,
+  submitLabel = "Anlegen",
+}: {
+  action: Action;
+  defaults?: InsightDefaults;
+  submitLabel?: string;
+}) {
   const [state, formAction, pending] = useActionState(action, emptyFormState);
 
   return (
@@ -34,7 +50,11 @@ export function InsightForm({ action }: { action: Action }) {
       )}
       <div>
         <Label htmlFor="insightType">Typ</Label>
-        <Select id="insightType" name="insightType" defaultValue="POSITIONING">
+        <Select
+          id="insightType"
+          name="insightType"
+          defaultValue={defaults?.insightType ?? "POSITIONING"}
+        >
           {INSIGHT_TYPES.map((t) => (
             <option key={t} value={t}>
               {t}
@@ -45,12 +65,17 @@ export function InsightForm({ action }: { action: Action }) {
       </div>
       <div>
         <Label htmlFor="title">Titel *</Label>
-        <Input id="title" name="title" required />
+        <Input id="title" name="title" required defaultValue={defaults?.title ?? ""} />
         <FieldError messages={state.fieldErrors?.title} />
       </div>
       <div>
         <Label htmlFor="content">Inhalt</Label>
-        <Textarea id="content" name="content" rows={4} />
+        <Textarea
+          id="content"
+          name="content"
+          rows={4}
+          defaultValue={defaults?.content ?? ""}
+        />
         <FieldError messages={state.fieldErrors?.content} />
       </div>
       <div>
@@ -61,13 +86,17 @@ export function InsightForm({ action }: { action: Action }) {
           type="number"
           min={0}
           max={100}
-          defaultValue={50}
+          defaultValue={defaults?.confidence ?? 50}
         />
         <FieldError messages={state.fieldErrors?.confidence} />
       </div>
       <div>
         <Label htmlFor="status">Status</Label>
-        <Select id="status" name="status" defaultValue="DRAFT">
+        <Select
+          id="status"
+          name="status"
+          defaultValue={defaults?.status ?? "DRAFT"}
+        >
           {STATUSES.map((s) => (
             <option key={s} value={s}>
               {s}
@@ -77,7 +106,7 @@ export function InsightForm({ action }: { action: Action }) {
         <FieldError messages={state.fieldErrors?.status} />
       </div>
       <Button type="submit" disabled={pending}>
-        {pending ? "Speichern…" : "Anlegen"}
+        {pending ? "Speichern…" : submitLabel}
       </Button>
     </form>
   );

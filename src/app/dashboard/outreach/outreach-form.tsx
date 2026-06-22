@@ -49,6 +49,8 @@ export interface OutreachFormValues {
   agreedTopic?: string | null;
   publicationUrl?: string | null;
   internalNotes?: string | null;
+  nextStep?: string | null;
+  channel?: string | null;
   responseReceivedAt?: Date | string | null;
   responseType?: string | null;
   responseSummary?: string | null;
@@ -230,6 +232,31 @@ export function OutreachForm({
             rows={3}
             defaultValue={defaults?.followUpEmail ?? ""}
           />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="channel">Versandkanal</Label>
+            <Select
+              id="channel"
+              name="channel"
+              defaultValue={defaults?.channel ?? ""}
+            >
+              <option value="">— keiner —</option>
+              <option value="ZIMPEL">Zimpel</option>
+              <option value="GMAIL">Gmail</option>
+              <option value="OUTLOOK">Outlook</option>
+              <option value="PHONE">Telefon</option>
+              <option value="OTHER">Sonstiges</option>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="nextStep">Nächster Schritt</Label>
+            <Input
+              id="nextStep"
+              name="nextStep"
+              defaultValue={defaults?.nextStep ?? ""}
+            />
+          </div>
         </div>
         <div>
           <Label htmlFor="internalNotes">Interne Notizen</Label>

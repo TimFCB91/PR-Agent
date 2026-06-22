@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireWriteAccess, AccessDeniedError } from "@/lib/tenant";
 import { outreachSchema } from "@/lib/validations";
 import { fieldErrorsFromZod, type FormState } from "@/lib/form";
+import { computeFollowUpDate } from "@/lib/outreach/outreachManager";
 import { runPitchAgent } from "@/lib/ai/agents/pitchAgent";
 import { runFollowUpAgent } from "@/lib/ai/agents/followUpAgent";
 import {
@@ -69,11 +70,28 @@ export async function createOutreachAction(
   }
 
   await prisma.outreach.create({
-    data: { ...parsed.data, organizationId: tenant.organizationId },
+    data: {
+      ...parsed.data,
+      ...autoFollowUp(parsed.data),
+      organizationId: tenant.organizationId,
+    },
   });
 
   revalidatePath("/dashboard/outreach");
   redirect("/dashboard/outreach");
+}
+
+// When a first mail is marked as sent and no follow-up date was entered, derive
+// it automatically (sentAt + N days), as described in the agency plan.
+function autoFollowUp(data: {
+  status: string;
+  sentAt?: Date | null;
+  nextFollowUpDate?: Date | null;
+}): { nextFollowUpDate?: Date } {
+  if (data.status === "SENT" && data.sentAt && !data.nextFollowUpDate) {
+    return { nextFollowUpDate: computeFollowUpDate(data.sentAt) };
+  }
+  return {};
 }
 
 export async function updateOutreachAction(
@@ -106,7 +124,7 @@ export async function updateOutreachAction(
 
   const result = await prisma.outreach.updateMany({
     where: { id, organizationId: tenant.organizationId },
-    data: parsed.data,
+    data: { ...parsed.data, ...autoFollowUp(parsed.data) },
   });
 
   if (result.count === 0) {

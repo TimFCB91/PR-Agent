@@ -34,6 +34,20 @@ Briefings und Artikelentwürfe bis zu Outreach, Veröffentlichungen und Reportin
   Outreach und Veröffentlichungen.
 - **Kunden-Dashboard mit Tabs** und **Kampagnen-Dashboard mit Kennzahlen**.
 - **Campaign Report** inkl. **externer Read-Only-Ansicht** über einen Share-Link.
+- **Durchgängig bearbeitbar**: Jedes Workflow-Objekt – Erkenntnisse, Themen,
+  Briefings, Artikel (inkl. Volltext), Pitches/Outreach, Medienkontakte,
+  Veröffentlichungen – lässt sich nachträglich über ein „✎ Bearbeiten"-Panel
+  anpassen. KI-Vorschläge sind nur Startpunkte, nichts ist fix.
+- **Operative Follow-up-Steuerung**:
+  - Tagesliste **„Fällige Follow-ups"** (eigener Menüpunkt) – zeigt nur
+    Kontakte mit Handlungsbedarf (Erstmail raus, keine Antwort, Datum erreicht,
+    nicht abgeschlossen, nicht gesperrt/Blacklist), sortiert nach A/B/C-Priorität.
+  - **Automatische Follow-up-Datums-Berechnung**: Sobald eine Outreach auf
+    `SENT` gesetzt wird und ein Versanddatum vorliegt, wird das Follow-up-Datum
+    automatisch berechnet (Standard +7 Tage, `FOLLOW_UP_AFTER_DAYS`).
+  - Medienkontakte mit **A/B/C-Priorität**, **Beziehung** (Normal/Gold/Blacklist)
+    und **„Nicht erneut kontaktieren"**-Schalter; Outreach mit **Versandkanal**
+    (Zimpel/Gmail/Outlook/…) und **nächstem Schritt**.
 - **Seed-Daten** mit zwei fiktiven Organisationen (keine echten Personen/Medien).
 
 ## PR-Workflow

@@ -23,6 +23,7 @@ import {
 } from "@/actions/raw-inputs";
 import {
   createInsightAction,
+  updateInsightAction,
   updateInsightStatusAction,
   deleteInsightAction,
   generateTopicsAction,
@@ -35,6 +36,7 @@ import {
 } from "@/actions/topics";
 import {
   createBriefingAction,
+  updateBriefingAction,
   deleteBriefingAction,
   buildArticleFromBriefingAction,
 } from "@/actions/briefings";
@@ -47,6 +49,7 @@ import {
 } from "@/actions/articles";
 import {
   createPublicationAction,
+  updatePublicationAction,
   deletePublicationAction,
 } from "@/actions/publications";
 import {
@@ -398,39 +401,65 @@ async function InsightsTab({
             </thead>
             <tbody className="divide-y divide-gray-100">
               {items.map((it) => (
-                <tr key={it.id} className="hover:bg-gray-50">
-                  <td className={td}>
-                    <Badge value={it.insightType} />
-                  </td>
-                  <td className="px-5 py-3 font-medium text-gray-900">
-                    {it.title}
-                  </td>
-                  <td className={td}>{it.confidence}</td>
-                  <td className={td}>
-                    <Badge value={it.status} />
-                  </td>
-                  <td className="px-5 py-3">
-                    {writable && (
-                      <div className="flex items-center justify-end gap-2">
-                        <ActionButton
-                          action={updateInsightStatusAction}
-                          fields={{ id: it.id, clientId, status: "APPROVED" }}
-                          label="Freigeben"
-                        />
-                        <ActionButton
-                          action={updateInsightStatusAction}
-                          fields={{ id: it.id, clientId, status: "REJECTED" }}
-                          label="Ablehnen"
-                        />
-                        <DeleteButton
-                          id={it.id}
-                          action={deleteInsightAction}
-                          extraFields={{ clientId }}
-                        />
-                      </div>
-                    )}
-                  </td>
-                </tr>
+                <Fragment key={it.id}>
+                  <tr className="hover:bg-gray-50">
+                    <td className={td}>
+                      <Badge value={it.insightType} />
+                    </td>
+                    <td className="px-5 py-3 font-medium text-gray-900">
+                      {it.title}
+                    </td>
+                    <td className={td}>{it.confidence}</td>
+                    <td className={td}>
+                      <Badge value={it.status} />
+                    </td>
+                    <td className="px-5 py-3">
+                      {writable && (
+                        <div className="flex items-center justify-end gap-2">
+                          <ActionButton
+                            action={updateInsightStatusAction}
+                            fields={{ id: it.id, clientId, status: "APPROVED" }}
+                            label="Freigeben"
+                          />
+                          <ActionButton
+                            action={updateInsightStatusAction}
+                            fields={{ id: it.id, clientId, status: "REJECTED" }}
+                            label="Ablehnen"
+                          />
+                          <DeleteButton
+                            id={it.id}
+                            action={deleteInsightAction}
+                            extraFields={{ clientId }}
+                          />
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  {writable && (
+                    <tr>
+                      <td colSpan={5} className="px-5 pb-4">
+                        <details>
+                          <summary className="cursor-pointer text-sm font-medium text-gray-600">
+                            ✎ Bearbeiten / Inhalt ansehen
+                          </summary>
+                          <div className="mt-3 max-w-2xl">
+                            <InsightForm
+                              action={updateInsightAction.bind(null, clientId, it.id)}
+                              submitLabel="Änderungen speichern"
+                              defaults={{
+                                insightType: it.insightType,
+                                title: it.title,
+                                content: it.content,
+                                confidence: it.confidence,
+                                status: it.status,
+                              }}
+                            />
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -1002,36 +1031,71 @@ async function BriefingsTab({
             </thead>
             <tbody className="divide-y divide-gray-100">
               {items.map((it) => (
-                <tr key={it.id} className="hover:bg-gray-50">
-                  <td className="px-5 py-3 font-medium text-gray-900">
-                    {it.title}
-                  </td>
-                  <td className={td}>
-                    <Badge value={it.status} />
-                  </td>
-                  <td className={td}>{it.topicIdea?.title ?? "—"}</td>
-                  <td className="px-5 py-3">
-                    {writable && (
-                      <div className="flex items-center justify-end gap-2">
-                        <ActionButton
-                          action={buildArticleFromBriefingAction}
-                          fields={{ id: it.id, clientId }}
-                          label="Artikel erstellen"
-                        />
-                        <ActionButton
-                          action={buildArticleViaAgentAction}
-                          fields={{ id: it.id, clientId }}
-                          label="KI-Artikel"
-                        />
-                        <DeleteButton
-                          id={it.id}
-                          action={deleteBriefingAction}
-                          extraFields={{ clientId }}
-                        />
-                      </div>
-                    )}
-                  </td>
-                </tr>
+                <Fragment key={it.id}>
+                  <tr className="hover:bg-gray-50">
+                    <td className="px-5 py-3 font-medium text-gray-900">
+                      {it.title}
+                    </td>
+                    <td className={td}>
+                      <Badge value={it.status} />
+                    </td>
+                    <td className={td}>{it.topicIdea?.title ?? "—"}</td>
+                    <td className="px-5 py-3">
+                      {writable && (
+                        <div className="flex items-center justify-end gap-2">
+                          <ActionButton
+                            action={buildArticleFromBriefingAction}
+                            fields={{ id: it.id, clientId }}
+                            label="Artikel erstellen"
+                          />
+                          <ActionButton
+                            action={buildArticleViaAgentAction}
+                            fields={{ id: it.id, clientId }}
+                            label="KI-Artikel"
+                          />
+                          <DeleteButton
+                            id={it.id}
+                            action={deleteBriefingAction}
+                            extraFields={{ clientId }}
+                          />
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  {writable && (
+                    <tr>
+                      <td colSpan={4} className="px-5 pb-4">
+                        <details>
+                          <summary className="cursor-pointer text-sm font-medium text-gray-600">
+                            ✎ Briefing öffnen / bearbeiten
+                          </summary>
+                          <div className="mt-3 max-w-3xl">
+                            <BriefingForm
+                              action={updateBriefingAction.bind(null, clientId, it.id)}
+                              campaigns={campaigns}
+                              topics={topics}
+                              contacts={contacts}
+                              submitLabel="Änderungen speichern"
+                              defaults={{
+                                title: it.title,
+                                targetAudience: it.targetAudience,
+                                angle: it.angle,
+                                keyMessages: it.keyMessages,
+                                suggestedStructure: it.suggestedStructure,
+                                expertContext: it.expertContext,
+                                noGos: it.noGos,
+                                status: it.status,
+                                campaignId: it.campaignId,
+                                topicIdeaId: it.topicIdeaId,
+                                mediaContactId: it.mediaContactId,
+                              }}
+                            />
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -1270,42 +1334,71 @@ async function PublicationsTab({
             </thead>
             <tbody className="divide-y divide-gray-100">
               {items.map((it) => (
-                <tr key={it.id} className="hover:bg-gray-50">
-                  <td className="px-5 py-3 font-medium text-gray-900">
-                    {it.title}
-                  </td>
-                  <td className={td}>
-                    {it.url ? (
-                      <a
-                        href={it.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-gray-700 underline"
-                      >
-                        Link
-                      </a>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className={td}>{fmtDate(it.publicationDate)}</td>
-                  <td className={td}>
-                    {it.mediaContact
-                      ? `${it.mediaContact.firstName} ${it.mediaContact.lastName}`
-                      : "—"}
-                  </td>
-                  <td className="px-5 py-3">
-                    {writable && (
-                      <div className="flex items-center justify-end">
-                        <DeleteButton
-                          id={it.id}
-                          action={deletePublicationAction}
-                          extraFields={{ clientId }}
-                        />
-                      </div>
-                    )}
-                  </td>
-                </tr>
+                <Fragment key={it.id}>
+                  <tr className="hover:bg-gray-50">
+                    <td className="px-5 py-3 font-medium text-gray-900">
+                      {it.title}
+                    </td>
+                    <td className={td}>
+                      {it.url ? (
+                        <a
+                          href={it.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-gray-700 underline"
+                        >
+                          Link
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className={td}>{fmtDate(it.publicationDate)}</td>
+                    <td className={td}>
+                      {it.mediaContact
+                        ? `${it.mediaContact.firstName} ${it.mediaContact.lastName}`
+                        : "—"}
+                    </td>
+                    <td className="px-5 py-3">
+                      {writable && (
+                        <div className="flex items-center justify-end">
+                          <DeleteButton
+                            id={it.id}
+                            action={deletePublicationAction}
+                            extraFields={{ clientId }}
+                          />
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  {writable && (
+                    <tr>
+                      <td colSpan={5} className="px-5 pb-4">
+                        <details>
+                          <summary className="cursor-pointer text-sm font-medium text-gray-600">
+                            ✎ Bearbeiten
+                          </summary>
+                          <div className="mt-3 max-w-2xl">
+                            <PublicationForm
+                              action={updatePublicationAction.bind(null, clientId, it.id)}
+                              campaigns={campaigns}
+                              contacts={contacts}
+                              submitLabel="Änderungen speichern"
+                              defaults={{
+                                title: it.title,
+                                url: it.url,
+                                publicationDate: it.publicationDate,
+                                notes: it.notes,
+                                campaignId: it.campaignId,
+                                mediaContactId: it.mediaContactId,
+                              }}
+                            />
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>

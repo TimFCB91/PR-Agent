@@ -41,6 +41,31 @@ export async function createInsightAction(
   return { ok: true };
 }
 
+export async function updateInsightAction(
+  clientId: string,
+  id: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const acc = await writeAccess();
+  if (acc.errorState) return acc.errorState;
+  const { tenant } = acc;
+
+  const parsed = insightSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return { ok: false, fieldErrors: fieldErrorsFromZod(parsed.error) };
+  }
+
+  const res = await prisma.clientInsight.updateMany({
+    where: { id, organizationId: tenant.organizationId },
+    data: { ...parsed.data },
+  });
+  if (res.count === 0) return { ok: false, error: "Erkenntnis nicht gefunden." };
+
+  rev(clientId);
+  return { ok: true };
+}
+
 export async function updateInsightStatusAction(
   formData: FormData,
 ): Promise<void> {

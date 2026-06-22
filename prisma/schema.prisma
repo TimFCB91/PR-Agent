@@ -105,6 +105,29 @@ enum OutreachStatus {
   PUBLISHED
 }
 
+// A/B/C priority for media contacts (drives follow-up cadence and draft style).
+enum ContactPriority {
+  A
+  B
+  C
+}
+
+// Relationship classification of a media contact (Goldkunde / Blacklist).
+enum ContactRelationship {
+  NORMAL
+  GOLD
+  BLACKLIST
+}
+
+// Channel an outreach was sent through.
+enum OutreachChannel {
+  ZIMPEL
+  GMAIL
+  OUTLOOK
+  PHONE
+  OTHER
+}
+
 enum RawInputSourceType {
   NOTE
   WEBSITE
@@ -217,28 +240,28 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users          User[]
-  clients        Client[]
-  campaigns      Campaign[]
-  mediaContacts  MediaContact[]
-  outreaches     Outreach[]
-  rawInputs      ClientRawInput[]
-  insights       ClientInsight[]
-  topicIdeas     TopicIdea[]
-  briefings      Briefing[]
-  articleDrafts  ArticleDraft[]
-  publications   Publication[]
-  writingRuleSets WritingRuleSet[]
-  knowledge       ClientKnowledge[]
-  knowledgeNodes  KnowledgeNode[]
-  knowledgeEdges  KnowledgeEdge[]
-  aiUsageLogs     AIUsageLog[]
-  textQualityReports TextQualityReport[]
-  knowledgeDocuments KnowledgeDocument[]
-  knowledgeChunks    KnowledgeChunk[]
-  knowledgeSourceRefs KnowledgeSourceRef[]
-  mediaPerformances  MediaPerformance[]
-  mediaInteractions  MediaInteraction[]
+  users                 User[]
+  clients               Client[]
+  campaigns             Campaign[]
+  mediaContacts         MediaContact[]
+  outreaches            Outreach[]
+  rawInputs             ClientRawInput[]
+  insights              ClientInsight[]
+  topicIdeas            TopicIdea[]
+  briefings             Briefing[]
+  articleDrafts         ArticleDraft[]
+  publications          Publication[]
+  writingRuleSets       WritingRuleSet[]
+  knowledge             ClientKnowledge[]
+  knowledgeNodes        KnowledgeNode[]
+  knowledgeEdges        KnowledgeEdge[]
+  aiUsageLogs           AIUsageLog[]
+  textQualityReports    TextQualityReport[]
+  knowledgeDocuments    KnowledgeDocument[]
+  knowledgeChunks       KnowledgeChunk[]
+  knowledgeSourceRefs   KnowledgeSourceRef[]
+  mediaPerformances     MediaPerformance[]
+  mediaInteractions     MediaInteraction[]
   journalistPreferences JournalistPreference[]
   mediaImportSessions   MediaImportSession[]
   mediaResearchResults  MediaResearchResult[]
@@ -276,17 +299,17 @@ model Client {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization  Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  campaigns     Campaign[]
-  rawInputs     ClientRawInput[]
-  insights      ClientInsight[]
-  topicIdeas    TopicIdea[]
-  briefings     Briefing[]
-  articleDrafts ArticleDraft[]
-  publications  Publication[]
-  knowledge      ClientKnowledge[]
-  knowledgeNodes KnowledgeNode[]
-  knowledgeEdges KnowledgeEdge[]
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaigns          Campaign[]
+  rawInputs          ClientRawInput[]
+  insights           ClientInsight[]
+  topicIdeas         TopicIdea[]
+  briefings          Briefing[]
+  articleDrafts      ArticleDraft[]
+  publications       Publication[]
+  knowledge          ClientKnowledge[]
+  knowledgeNodes     KnowledgeNode[]
+  knowledgeEdges     KnowledgeEdge[]
   knowledgeDocuments KnowledgeDocument[]
   knowledgeChunks    KnowledgeChunk[]
 
@@ -308,13 +331,13 @@ model Campaign {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  outreaches    Outreach[]
-  topicIdeas    TopicIdea[]
-  briefings     Briefing[]
-  articleDrafts ArticleDraft[]
-  publications  Publication[]
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client             Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  outreaches         Outreach[]
+  topicIdeas         TopicIdea[]
+  briefings          Briefing[]
+  articleDrafts      ArticleDraft[]
+  publications       Publication[]
   knowledgeDocuments KnowledgeDocument[]
 
   @@index([organizationId])
@@ -322,35 +345,39 @@ model Campaign {
 }
 
 model MediaContact {
-  id             String   @id @default(cuid())
-  firstName      String
-  lastName       String
-  email          String?
-  phone          String?
-  outlet         String?
-  beat           String?
-  notes          String?
+  id                    String              @id @default(cuid())
+  firstName             String
+  lastName              String
+  email                 String?
+  phone                 String?
+  outlet                String?
+  beat                  String?
+  notes                 String?
+  // Operative steering — priority, relationship and contact protection.
+  priority              ContactPriority     @default(B)
+  relationship          ContactRelationship @default(NORMAL)
+  doNotContact          Boolean             @default(false)
   // Media intelligence — learned from real outreach/publication history.
   replyRate             Float?
   acceptanceRate        Float?
   publicationRate       Float?
-  averageResponseTime   Float?   // hours
+  averageResponseTime   Float? // hours
   lastSuccessfulTopic   String?
-  preferredAngles       String[] @default([])
-  avoidedTopics         String[] @default([])
+  preferredAngles       String[]            @default([])
+  avoidedTopics         String[]            @default([])
   notesFromInteractions String?
   // Provenance — how the contact entered the system.
-  sourceType         MediaSourceType    @default(MANUAL)
-  sourceImportId     String?
-  sourceUrls         String[]           @default([])
-  importedAt         DateTime?
-  verifiedAt         DateTime?
-  verificationStatus VerificationStatus @default(UNVERIFIED)
-  organizationId String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  sourceType            MediaSourceType     @default(MANUAL)
+  sourceImportId        String?
+  sourceUrls            String[]            @default([])
+  importedAt            DateTime?
+  verifiedAt            DateTime?
+  verificationStatus    VerificationStatus  @default(UNVERIFIED)
+  organizationId        String
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   outreaches   Outreach[]
   briefings    Briefing[]
   publications Publication[]
@@ -362,38 +389,41 @@ model MediaContact {
 }
 
 model Outreach {
-  id             String         @id @default(cuid())
-  subject        String
-  message        String?
-  status         OutreachStatus @default(DRAFT)
-  sentAt         DateTime?
+  id                 String           @id @default(cuid())
+  subject            String
+  message            String?
+  status             OutreachStatus   @default(DRAFT)
+  sentAt             DateTime?
   // Extended PR-process fields.
-  pitchEmail        String?
-  followUpEmail     String?
-  lastContactDate   DateTime?
-  nextFollowUpDate  DateTime?
-  agreedTopic       String?
-  publicationUrl    String?
-  internalNotes     String?
+  pitchEmail         String?
+  followUpEmail      String?
+  lastContactDate    DateTime?
+  nextFollowUpDate   DateTime?
+  agreedTopic        String?
+  publicationUrl     String?
+  internalNotes      String?
+  // Operative steering — how it was sent and the explicit next step.
+  channel            OutreachChannel?
+  nextStep           String?
   // Media intelligence — captured response signals.
   responseReceivedAt DateTime?
   responseType       ResponseType?
   responseSummary    String?
   rejectionReason    String?
   acceptedAngle      String?
-  followUpCount      Int          @default(0)
-  publicationCreated Boolean      @default(false)
-  campaignId     String
-  mediaContactId String
-  organizationId String
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  followUpCount      Int              @default(0)
+  publicationCreated Boolean          @default(false)
+  campaignId         String
+  mediaContactId     String
+  organizationId     String
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  mediaContact MediaContact @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
-  sourcedPublications Publication[] @relation("PublicationSource")
-  interactions MediaInteraction[]
+  organization        Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign            Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  mediaContact        MediaContact       @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
+  sourcedPublications Publication[]      @relation("PublicationSource")
+  interactions        MediaInteraction[]
 
   @@index([organizationId])
   @@index([campaignId])
@@ -418,9 +448,9 @@ model ClientRawInput {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  createdBy    User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client             Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy          User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
   knowledgeDocuments KnowledgeDocument[]
 
   @@index([organizationId])
@@ -476,28 +506,28 @@ model TopicIdea {
 
 // 4. Briefings for a pitch / article.
 model Briefing {
-  id                String         @id @default(cuid())
-  title             String
-  targetAudience    String?
-  angle             String?
-  keyMessages       String?
+  id                 String         @id @default(cuid())
+  title              String
+  targetAudience     String?
+  angle              String?
+  keyMessages        String?
   suggestedStructure String?
-  expertContext     String?
-  noGos             String?
-  status            BriefingStatus @default(DRAFT)
-  clientId          String
-  campaignId        String?
-  topicIdeaId       String?
-  mediaContactId    String?
-  organizationId    String
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  expertContext      String?
+  noGos              String?
+  status             BriefingStatus @default(DRAFT)
+  clientId           String
+  campaignId         String?
+  topicIdeaId        String?
+  mediaContactId     String?
+  organizationId     String
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  campaign     Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  topicIdea    TopicIdea?    @relation(fields: [topicIdeaId], references: [id], onDelete: SetNull)
-  mediaContact MediaContact? @relation(fields: [mediaContactId], references: [id], onDelete: SetNull)
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign      Campaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  topicIdea     TopicIdea?     @relation(fields: [topicIdeaId], references: [id], onDelete: SetNull)
+  mediaContact  MediaContact?  @relation(fields: [mediaContactId], references: [id], onDelete: SetNull)
   articleDrafts ArticleDraft[]
 
   @@index([organizationId])
@@ -535,22 +565,22 @@ model ArticleDraft {
 
 // 6. Publications (placed coverage).
 model Publication {
-  id              String    @id @default(cuid())
-  title           String
-  url             String?
-  publicationDate DateTime?
-  notes           String?
+  id               String    @id @default(cuid())
+  title            String
+  url              String?
+  publicationDate  DateTime?
+  notes            String?
   // Media intelligence — what worked and where it came from.
   resultingTopic   String?
   resultingAngle   String?
   sourceOutreachId String?
   performanceNotes String?
-  clientId        String
-  campaignId      String?
-  mediaContactId  String?
-  organizationId  String
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  clientId         String
+  campaignId       String?
+  mediaContactId   String?
+  organizationId   String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   client         Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -565,25 +595,25 @@ model Publication {
 
 // 10. Writing rule sets used to constrain article generation later.
 model WritingRuleSet {
-  id                String   @id @default(cuid())
-  name              String
-  description       String?
-  rules             String?
-  forbiddenPhrases  String[] @default([])
-  requiredElements  String[] @default([])
-  preferredStructure String?
-  toneOfVoice       String?
-  textType          TextType @default(OTHER)
-  targetMediumType  String?
-  minWords          Int?
-  maxWords          Int?
-  allowGendering          Boolean @default(true)
-  allowAnglicisms         Boolean @default(false)
-  allowFirstPerson        Boolean @default(true)
-  allowDirectClientMention Boolean @default(true)
-  organizationId    String
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                       String   @id @default(cuid())
+  name                     String
+  description              String?
+  rules                    String?
+  forbiddenPhrases         String[] @default([])
+  requiredElements         String[] @default([])
+  preferredStructure       String?
+  toneOfVoice              String?
+  textType                 TextType @default(OTHER)
+  targetMediumType         String?
+  minWords                 Int?
+  maxWords                 Int?
+  allowGendering           Boolean  @default(true)
+  allowAnglicisms          Boolean  @default(false)
+  allowFirstPerson         Boolean  @default(true)
+  allowDirectClientMention Boolean  @default(true)
+  organizationId           String
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -726,10 +756,10 @@ model KnowledgeDocument {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  campaign     Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  rawInput     ClientRawInput? @relation(fields: [rawInputId], references: [id], onDelete: SetNull)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign     Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  rawInput     ClientRawInput?  @relation(fields: [rawInputId], references: [id], onDelete: SetNull)
   chunks       KnowledgeChunk[]
 
   @@index([organizationId])
@@ -806,16 +836,16 @@ model MediaPerformance {
 
 // A single logged interaction with a media contact (the learning signal).
 model MediaInteraction {
-  id             String             @id @default(cuid())
+  id              String             @id @default(cuid())
   interactionType InteractionType
-  topicTitle     String?
-  mediaAngle     String?
-  result         InteractionResult?
-  notes          String?
-  mediaContactId String
-  outreachId     String?
-  organizationId String
-  createdAt      DateTime           @default(now())
+  topicTitle      String?
+  mediaAngle      String?
+  result          InteractionResult?
+  notes           String?
+  mediaContactId  String
+  outreachId      String?
+  organizationId  String
+  createdAt       DateTime           @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   mediaContact MediaContact @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
@@ -827,17 +857,17 @@ model MediaInteraction {
 
 // Derived journalist preferences (built automatically from interactions).
 model JournalistPreference {
-  id              String   @id @default(cuid())
-  preferredTopics String[] @default([])
-  preferredAngles String[] @default([])
-  avoidedTopics   String[] @default([])
+  id               String   @id @default(cuid())
+  preferredTopics  String[] @default([])
+  preferredAngles  String[] @default([])
+  avoidedTopics    String[] @default([])
   preferredFormats String[] @default([])
-  notes           String?
-  confidence      Int      @default(0) // 0-100
-  mediaContactId  String   @unique
-  organizationId  String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  notes            String?
+  confidence       Int      @default(0) // 0-100
+  mediaContactId   String   @unique
+  organizationId   String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   mediaContact MediaContact @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
@@ -870,26 +900,26 @@ model MediaImportSession {
 
 // A researched media suggestion. NEVER auto-imported — needs manual approval.
 model MediaResearchResult {
-  id             String         @id @default(cuid())
-  mediumName     String
-  website        String?
-  mediaType      String?
-  section        String?
-  region         String?
-  contactName    String?
-  contactRole    String?
-  email          String?
-  contactPageUrl String?
-  sourceUrls     String[]       @default([])
+  id              String         @id @default(cuid())
+  mediumName      String
+  website         String?
+  mediaType       String?
+  section         String?
+  region          String?
+  contactName     String?
+  contactRole     String?
+  email           String?
+  contactPageUrl  String?
+  sourceUrls      String[]       @default([])
   relevanceReason String?
-  suggestedAngle String?
-  confidence     Int            @default(0)
-  status         ResearchStatus @default(SUGGESTED)
-  clientId       String
-  campaignId     String?
-  topicIdeaId    String?
-  organizationId String
-  createdAt      DateTime       @default(now())
+  suggestedAngle  String?
+  confidence      Int            @default(0)
+  status          ResearchStatus @default(SUGGESTED)
+  clientId        String
+  campaignId      String?
+  topicIdeaId     String?
+  organizationId  String
+  createdAt       DateTime       @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 

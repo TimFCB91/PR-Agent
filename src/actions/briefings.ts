@@ -86,6 +86,40 @@ export async function createBriefingAction(
   return { ok: true };
 }
 
+export async function updateBriefingAction(
+  clientId: string,
+  id: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const acc = await writeAccess();
+  if (acc.errorState) return acc.errorState;
+  const { tenant } = acc;
+
+  const parsed = briefingSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return { ok: false, fieldErrors: fieldErrorsFromZod(parsed.error) };
+  }
+
+  if (!(await validRefs(parsed.data, tenant.organizationId))) {
+    return { ok: false, error: "Ungültige Verknüpfung." };
+  }
+
+  const res = await prisma.briefing.updateMany({
+    where: { id, organizationId: tenant.organizationId },
+    data: {
+      ...parsed.data,
+      campaignId: parsed.data.campaignId ?? null,
+      topicIdeaId: parsed.data.topicIdeaId ?? null,
+      mediaContactId: parsed.data.mediaContactId ?? null,
+    },
+  });
+  if (res.count === 0) return { ok: false, error: "Briefing nicht gefunden." };
+
+  rev(clientId);
+  return { ok: true };
+}
+
 export async function deleteBriefingAction(formData: FormData): Promise<void> {
   const tenant = await requireWriteAccess();
   const id = String(formData.get("id"));
