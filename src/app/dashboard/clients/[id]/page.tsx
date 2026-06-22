@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -28,6 +29,7 @@ import {
 } from "@/actions/insights";
 import {
   createTopicAction,
+  updateTopicAction,
   deleteTopicAction,
   buildBriefingFromTopicAction,
 } from "@/actions/topics";
@@ -38,6 +40,7 @@ import {
 } from "@/actions/briefings";
 import {
   createArticleAction,
+  updateArticleAction,
   updateArticleStatusAction,
   deleteArticleAction,
   checkArticleQualityAction,
@@ -721,51 +724,82 @@ async function TopicsTab({
             </thead>
             <tbody className="divide-y divide-gray-100">
               {items.map((it) => (
-                <tr key={it.id} className="hover:bg-gray-50">
-                  <td className="px-5 py-3 font-medium text-gray-900">
-                    {it.title}
-                  </td>
-                  <td className={td}>{it.mediaAngle ?? "—"}</td>
-                  <td className={td}>{it.targetMediaType ?? "—"}</td>
-                  <td className={td}>
-                    <Badge value={it.searchPotential} />
-                  </td>
-                  <td className={td}>
-                    <Badge value={it.newsValue} />
-                  </td>
-                  <td className={td}>
-                    <Badge value={it.priority} />
-                  </td>
-                  <td className={td}>
-                    <Badge value={it.status} />
-                  </td>
-                  <td className="px-5 py-3">
-                    {writable && (
-                      <div className="flex items-center justify-end gap-2">
-                        <ActionButton
-                          action={buildBriefingFromTopicAction}
-                          fields={{ id: it.id, clientId }}
-                          label="Briefing erstellen"
-                        />
-                        <ActionButton
-                          action={buildBriefingViaAgentAction}
-                          fields={{ id: it.id, clientId }}
-                          label="KI-Briefing"
-                        />
-                        <ActionButton
-                          action={matchAndCreateOutreachAction}
-                          fields={{ id: it.id, clientId }}
-                          label="Medien-Matching"
-                        />
-                        <DeleteButton
-                          id={it.id}
-                          action={deleteTopicAction}
-                          extraFields={{ clientId }}
-                        />
-                      </div>
-                    )}
-                  </td>
-                </tr>
+                <Fragment key={it.id}>
+                  <tr className="hover:bg-gray-50">
+                    <td className="px-5 py-3 font-medium text-gray-900">
+                      {it.title}
+                    </td>
+                    <td className={td}>{it.mediaAngle ?? "—"}</td>
+                    <td className={td}>{it.targetMediaType ?? "—"}</td>
+                    <td className={td}>
+                      <Badge value={it.searchPotential} />
+                    </td>
+                    <td className={td}>
+                      <Badge value={it.newsValue} />
+                    </td>
+                    <td className={td}>
+                      <Badge value={it.priority} />
+                    </td>
+                    <td className={td}>
+                      <Badge value={it.status} />
+                    </td>
+                    <td className="px-5 py-3">
+                      {writable && (
+                        <div className="flex items-center justify-end gap-2">
+                          <ActionButton
+                            action={buildBriefingFromTopicAction}
+                            fields={{ id: it.id, clientId }}
+                            label="Briefing erstellen"
+                          />
+                          <ActionButton
+                            action={buildBriefingViaAgentAction}
+                            fields={{ id: it.id, clientId }}
+                            label="KI-Briefing"
+                          />
+                          <ActionButton
+                            action={matchAndCreateOutreachAction}
+                            fields={{ id: it.id, clientId }}
+                            label="Medien-Matching"
+                          />
+                          <DeleteButton
+                            id={it.id}
+                            action={deleteTopicAction}
+                            extraFields={{ clientId }}
+                          />
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  {writable && (
+                    <tr>
+                      <td colSpan={8} className="px-5 pb-4">
+                        <details>
+                          <summary className="cursor-pointer text-sm font-medium text-gray-600">
+                            ✎ Bearbeiten / Details ansehen
+                          </summary>
+                          <div className="mt-3 max-w-2xl">
+                            <TopicForm
+                              action={updateTopicAction.bind(null, clientId, it.id)}
+                              campaigns={campaigns}
+                              submitLabel="Änderungen speichern"
+                              defaults={{
+                                title: it.title,
+                                description: it.description,
+                                mediaAngle: it.mediaAngle,
+                                targetMediaType: it.targetMediaType,
+                                searchPotential: it.searchPotential,
+                                newsValue: it.newsValue,
+                                priority: it.priority,
+                                status: it.status,
+                                campaignId: it.campaignId,
+                              }}
+                            />
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -1079,46 +1113,78 @@ async function ArticlesTab({
             </thead>
             <tbody className="divide-y divide-gray-100">
               {items.map((it) => (
-                <tr key={it.id} className="hover:bg-gray-50">
-                  <td className="px-5 py-3 font-medium text-gray-900">
-                    <div>{it.title}</div>
-                    {it.qualityNotes && (
-                      <pre className="whitespace-pre-wrap text-xs text-gray-600">
-                        {it.qualityNotes}
-                      </pre>
-                    )}
-                  </td>
-                  <td className={td}>{it.targetMedium ?? "—"}</td>
-                  <td className={td}>
-                    <Badge value={it.status} />
-                  </td>
-                  <td className="px-5 py-3">
-                    {writable && (
-                      <div className="flex items-center justify-end gap-2">
-                        <ActionButton
-                          action={checkArticleQualityAction}
-                          fields={{ id: it.id, clientId }}
-                          label="Qualität prüfen"
-                        />
-                        <ActionButton
-                          action={updateArticleStatusAction}
-                          fields={{ id: it.id, clientId, status: "REVIEW" }}
-                          label="In Review"
-                        />
-                        <ActionButton
-                          action={updateArticleStatusAction}
-                          fields={{ id: it.id, clientId, status: "APPROVED" }}
-                          label="Freigeben"
-                        />
-                        <DeleteButton
-                          id={it.id}
-                          action={deleteArticleAction}
-                          extraFields={{ clientId }}
-                        />
-                      </div>
-                    )}
-                  </td>
-                </tr>
+                <Fragment key={it.id}>
+                  <tr className="hover:bg-gray-50">
+                    <td className="px-5 py-3 font-medium text-gray-900">
+                      <div>{it.title}</div>
+                      {it.qualityNotes && (
+                        <pre className="whitespace-pre-wrap text-xs text-gray-600">
+                          {it.qualityNotes}
+                        </pre>
+                      )}
+                    </td>
+                    <td className={td}>{it.targetMedium ?? "—"}</td>
+                    <td className={td}>
+                      <Badge value={it.status} />
+                    </td>
+                    <td className="px-5 py-3">
+                      {writable && (
+                        <div className="flex items-center justify-end gap-2">
+                          <ActionButton
+                            action={checkArticleQualityAction}
+                            fields={{ id: it.id, clientId }}
+                            label="Qualität prüfen"
+                          />
+                          <ActionButton
+                            action={updateArticleStatusAction}
+                            fields={{ id: it.id, clientId, status: "REVIEW" }}
+                            label="In Review"
+                          />
+                          <ActionButton
+                            action={updateArticleStatusAction}
+                            fields={{ id: it.id, clientId, status: "APPROVED" }}
+                            label="Freigeben"
+                          />
+                          <DeleteButton
+                            id={it.id}
+                            action={deleteArticleAction}
+                            extraFields={{ clientId }}
+                          />
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  {writable && (
+                    <tr>
+                      <td colSpan={4} className="px-5 pb-4">
+                        <details>
+                          <summary className="cursor-pointer text-sm font-medium text-gray-600">
+                            ✎ Artikel öffnen / bearbeiten
+                          </summary>
+                          <div className="mt-3 max-w-3xl">
+                            <ArticleForm
+                              action={updateArticleAction.bind(null, clientId, it.id)}
+                              campaigns={campaigns}
+                              briefings={briefings}
+                              submitLabel="Änderungen speichern"
+                              defaults={{
+                                title: it.title,
+                                subtitle: it.subtitle,
+                                articleText: it.articleText,
+                                metaDescription: it.metaDescription,
+                                targetMedium: it.targetMedium,
+                                targetAudience: it.targetAudience,
+                                status: it.status,
+                                campaignId: it.campaignId,
+                                briefingId: it.briefingId,
+                              }}
+                            />
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>

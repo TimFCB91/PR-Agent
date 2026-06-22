@@ -73,6 +73,39 @@ export async function createArticleAction(
   return { ok: true };
 }
 
+export async function updateArticleAction(
+  clientId: string,
+  id: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const acc = await writeAccess();
+  if (acc.errorState) return acc.errorState;
+  const { tenant } = acc;
+
+  const parsed = articleSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return { ok: false, fieldErrors: fieldErrorsFromZod(parsed.error) };
+  }
+
+  if (!(await validRefs(parsed.data, tenant.organizationId))) {
+    return { ok: false, error: "Ungültige Verknüpfung." };
+  }
+
+  const res = await prisma.articleDraft.updateMany({
+    where: { id, organizationId: tenant.organizationId },
+    data: {
+      ...parsed.data,
+      campaignId: parsed.data.campaignId ?? null,
+      briefingId: parsed.data.briefingId ?? null,
+    },
+  });
+  if (res.count === 0) return { ok: false, error: "Artikel nicht gefunden." };
+
+  rev(clientId);
+  return { ok: true };
+}
+
 export async function updateArticleStatusAction(
   formData: FormData,
 ): Promise<void> {

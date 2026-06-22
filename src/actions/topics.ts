@@ -58,6 +58,36 @@ export async function createTopicAction(
   return { ok: true };
 }
 
+export async function updateTopicAction(
+  clientId: string,
+  id: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const acc = await writeAccess();
+  if (acc.errorState) return acc.errorState;
+  const { tenant } = acc;
+
+  const parsed = topicSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return { ok: false, fieldErrors: fieldErrorsFromZod(parsed.error) };
+  }
+
+  if (!(await validCampaign(parsed.data.campaignId, tenant.organizationId))) {
+    return { ok: false, error: "Ungültige Kampagne." };
+  }
+
+  const res = await prisma.topicIdea.updateMany({
+    where: { id, organizationId: tenant.organizationId },
+    // campaignId ?? null lets the user clear the campaign link.
+    data: { ...parsed.data, campaignId: parsed.data.campaignId ?? null },
+  });
+  if (res.count === 0) return { ok: false, error: "Thema nicht gefunden." };
+
+  rev(clientId);
+  return { ok: true };
+}
+
 export async function deleteTopicAction(formData: FormData): Promise<void> {
   const tenant = await requireWriteAccess();
   const id = String(formData.get("id"));
