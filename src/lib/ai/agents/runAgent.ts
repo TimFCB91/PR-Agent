@@ -3,11 +3,34 @@ import type { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getAIConfig } from "@/lib/ai/config";
 import { getAIProvider } from "@/lib/ai/provider";
-import type { AIMessage } from "@/lib/ai/types";
+import type { AIMessage, AIMode } from "@/lib/ai/types";
 
 export interface AgentContext {
   organizationId: string;
   userId?: string;
+}
+
+/**
+ * Result envelope for every agent run. `usedFallback` is true when real AI was
+ * requested but failed and the deterministic mock was used instead — callers
+ * must surface this so users never mistake placeholder output for real AI.
+ */
+export interface AgentRunResult<O> {
+  output: O;
+  usedFallback: boolean;
+  error?: string;
+  mode: AIMode;
+}
+
+/** Human-readable warning to attach to generated content when AI fell back. */
+export function fallbackNotice(r: {
+  usedFallback: boolean;
+  error?: string;
+}): string {
+  if (!r.usedFallback) return "";
+  return `⚠️ KI nicht verfügbar – es wurde ein Platzhalter (Mock) eingesetzt. Bitte erneut versuchen. Grund: ${
+    r.error ?? "unbekannt"
+  }`;
 }
 
 /**
@@ -38,7 +61,7 @@ export async function runAgent<I, O>(
   def: AgentDefinition<I, O>,
   rawInput: unknown,
   ctx: AgentContext,
-): Promise<O> {
+): Promise<AgentRunResult<O>> {
   const input = def.inputSchema.parse(rawInput);
   const config = getAIConfig();
   const startedAt = Date.now();
@@ -92,5 +115,10 @@ export async function runAgent<I, O>(
     // ignore logging failures
   }
 
-  return output;
+  return {
+    output,
+    usedFallback: config.mode === "real" && !success,
+    error: errorMessage,
+    mode: config.mode,
+  };
 }

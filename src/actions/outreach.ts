@@ -8,6 +8,7 @@ import { requireWriteAccess, AccessDeniedError } from "@/lib/tenant";
 import { outreachSchema } from "@/lib/validations";
 import { fieldErrorsFromZod, type FormState } from "@/lib/form";
 import { computeFollowUpDate } from "@/lib/outreach/outreachManager";
+import { fallbackNotice } from "@/lib/ai/agents/runAgent";
 import { runPitchAgent } from "@/lib/ai/agents/pitchAgent";
 import { runFollowUpAgent } from "@/lib/ai/agents/followUpAgent";
 import {
@@ -205,7 +206,7 @@ export async function generatePitchAction(formData: FormData): Promise<void> {
     tenant.organizationId,
   );
 
-  const [pitch, followUp] = await Promise.all([
+  const [pitchRun, followUpRun] = await Promise.all([
     runPitchAgent(
       {
         clientName,
@@ -236,14 +237,19 @@ export async function generatePitchAction(formData: FormData): Promise<void> {
     ),
   ]);
 
+  const pitch = pitchRun.output;
+  const followUp = followUpRun.output;
+  const pitchNotice = fallbackNotice(pitchRun);
+  const followUpNotice = fallbackNotice(followUpRun);
+
   await saveSourceRefs("PITCH", id, tenant.organizationId, pitch.sourceReferences);
   await saveSourceRefs("FOLLOW_UP", id, tenant.organizationId, followUp.sourceReferences);
 
   await prisma.outreach.updateMany({
     where: { id, organizationId: tenant.organizationId },
     data: {
-      pitchEmail: pitch.pitchEmail,
-      followUpEmail: followUp.message,
+      pitchEmail: [pitchNotice, pitch.pitchEmail].filter(Boolean).join("\n\n"),
+      followUpEmail: [followUpNotice, followUp.message].filter(Boolean).join("\n\n"),
     },
   });
 

@@ -11,6 +11,7 @@ import { runBriefingAgent } from "@/lib/ai/agents/briefingAgent";
 import { runArticleAgent } from "@/lib/ai/agents/articleAgent";
 import { runMediaMatchingAgent } from "@/lib/ai/agents/mediaMatchingAgent";
 import { runFollowUpAgent, type FollowUpAgentInput } from "@/lib/ai/agents/followUpAgent";
+import { fallbackNotice } from "@/lib/ai/agents/runAgent";
 import {
   buildClientEvidence,
   getRuleSetForType,
@@ -120,10 +121,12 @@ export async function generateTopicsFromKnowledgeAction(
   );
 
   const history = await getAllTopicOutcomes(tenant.organizationId);
-  const result = await runTopicAgent(
+  const run = await runTopicAgent(
     { clientName: client.name, knowledge, sources: gathered.chunks, history },
     { organizationId: tenant.organizationId, userId: tenant.userId },
   );
+  const result = run.output;
+  const notice = fallbackNotice(run);
 
   // Create topics individually so each can carry its source references.
   for (const t of result.topics) {
@@ -132,6 +135,7 @@ export async function generateTopicsFromKnowledgeAction(
         clientId,
         organizationId: tenant.organizationId,
         title: t.title,
+        description: notice || undefined,
         mediaAngle: t.mediaAngle,
         targetMediaType: t.targetMediaType,
         searchPotential: t.searchPotential as Level,
@@ -180,7 +184,7 @@ export async function buildBriefingViaAgentAction(
     { campaignId: topic.campaignId },
   );
 
-  const result = await runBriefingAgent(
+  const run = await runBriefingAgent(
     {
       clientName: topic.client.name,
       topicTitle: topic.title,
@@ -193,6 +197,8 @@ export async function buildBriefingViaAgentAction(
     },
     { organizationId: tenant.organizationId, userId: tenant.userId },
   );
+  const result = run.output;
+  const notice = fallbackNotice(run);
 
   const briefing = await prisma.briefing.create({
     data: {
@@ -206,7 +212,7 @@ export async function buildBriefingViaAgentAction(
       angle: topic.mediaAngle,
       keyMessages: result.keyMessages,
       suggestedStructure: result.structure,
-      expertContext: result.expertContext,
+      expertContext: [notice, result.expertContext].filter(Boolean).join("\n\n"),
       noGos: result.noGos,
     },
     select: { id: true },
@@ -266,7 +272,7 @@ export async function buildArticleViaAgentAction(
     { campaignId: briefing.campaignId },
   );
 
-  const result = await runArticleAgent(
+  const run = await runArticleAgent(
     {
       clientName: briefing.client.name,
       briefingTitle: briefing.title,
@@ -287,6 +293,8 @@ export async function buildArticleViaAgentAction(
     },
     { organizationId: tenant.organizationId, userId: tenant.userId },
   );
+  const result = run.output;
+  const notice = fallbackNotice(run);
 
   const article = await prisma.articleDraft.create({
     data: {
@@ -321,11 +329,21 @@ export async function buildArticleViaAgentAction(
     result.sourceReferences,
   );
 
-  // Generated articles always land in REVIEW; approval is a manual quality step.
-  void report;
+  // Quality gate: a fact-unsafe draft is NOT moved forward — it stays DRAFT and
+  // is clearly flagged. Only fact-safe drafts advance to REVIEW for the human
+  // approval step. The result is summarised into qualityNotes so it's visible
+  // in the article list.
+  const factRisk = !report.factSafety.passed;
+  const qualitySummary =
+    `Qualität: Score ${report.score}/100 · ` +
+    (report.canApprove ? "freigabefähig" : "noch nicht freigabefähig") +
+    (factRisk ? " · ⚠️ FAKTENRISIKO: bitte Quellen prüfen" : "");
   await prisma.articleDraft.updateMany({
     where: { id: article.id, organizationId: tenant.organizationId },
-    data: { status: "REVIEW" },
+    data: {
+      status: factRisk ? "DRAFT" : "REVIEW",
+      qualityNotes: [notice, qualitySummary].filter(Boolean).join("\n"),
+    },
   });
 
   await prisma.briefing.updateMany({
@@ -364,7 +382,7 @@ export async function matchAndCreateOutreachAction(
     { campaignId: topic.campaignId },
   );
 
-  const result = await runMediaMatchingAgent(
+  const run = await runMediaMatchingAgent(
     {
       topic: {
         title: topic.title,
@@ -388,6 +406,8 @@ export async function matchAndCreateOutreachAction(
     },
     { organizationId: tenant.organizationId, userId: tenant.userId },
   );
+  const result = run.output;
+  const notice = fallbackNotice(run);
 
   await saveSourceRefs(
     "MEDIA_MATCH",
@@ -406,7 +426,12 @@ export async function matchAndCreateOutreachAction(
         subject: topic.title,
         status: "DRAFT",
         agreedTopic: topic.title,
-        internalNotes: `Match-Score ${match.matchScore} · Historie ${match.historicalSuccessScore}: ${match.reason}\nVorgeschlagener Winkel: ${match.suggestedAngle}`,
+        internalNotes: [
+          notice,
+          `Match-Score ${match.matchScore} · Historie ${match.historicalSuccessScore}: ${match.reason}\nVorgeschlagener Winkel: ${match.suggestedAngle}`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
       },
     });
   }
@@ -443,7 +468,7 @@ export async function generateFollowUpViaAgentAction(
     outreach.agreedTopic ?? outreach.subject,
   );
 
-  const result = await runFollowUpAgent(
+  const run = await runFollowUpAgent(
     {
       variant,
       clientName: outreach.campaign.client.name,
@@ -453,10 +478,14 @@ export async function generateFollowUpViaAgentAction(
     },
     { organizationId: tenant.organizationId, userId: tenant.userId },
   );
+  const result = run.output;
+  const notice = fallbackNotice(run);
 
   await prisma.outreach.updateMany({
     where: { id, organizationId: tenant.organizationId },
-    data: { followUpEmail: result.message },
+    data: {
+      followUpEmail: [notice, result.message].filter(Boolean).join("\n\n"),
+    },
   });
 
   await saveSourceRefs(
