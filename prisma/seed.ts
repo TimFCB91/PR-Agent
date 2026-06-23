@@ -30,7 +30,7 @@ async function main() {
       users: {
         create: [
           {
-            name: "Alex Owner",
+            name: "Tim Schoster",
             email: "owner@acme.test",
             passwordHash,
             role: "OWNER",

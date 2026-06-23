@@ -34,6 +34,11 @@ export default async function SettingsPage() {
             <dd className="font-medium text-gray-900">{organization?.slug}</dd>
           </div>
         </dl>
+        <div className="mt-4">
+          <LinkButton href="/dashboard/settings/profile">
+            Profil & Organisation bearbeiten
+          </LinkButton>
+        </div>
       </Card>
 
       <Card className="overflow-hidden">
