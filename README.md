@@ -210,6 +210,12 @@ ANTHROPIC_API_KEY="sk-ant-..."
 Für lokale Modelle (Ollama, vLLM, LM Studio): `AI_PROVIDER=local` +
 `AI_LOCAL_BASE_URL`. Siehe `.env.example`.
 
+**Mit Docker/Codespaces:** Lege eine Datei `.env` neben die `docker-compose.yml`
+mit mindestens `AI_MODE=real` und `ANTHROPIC_API_KEY=…`. Compose übernimmt diese
+Werte automatisch in den Container. Ein falscher/fehlender Key bricht nichts –
+der Aufruf fällt still auf den Mock zurück und wird unter **Einstellungen → AI**
+als fehlgeschlagen protokolliert.
+
 ### AI Usage Logging
 
 Jeder Agenten-Aufruf wird in **`AIUsageLog`** protokolliert (Agent, Provider,

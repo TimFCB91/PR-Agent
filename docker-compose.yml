@@ -30,8 +30,16 @@ services:
       # incoming request, so it works on localhost AND behind the Codespaces
       # (*.app.github.dev) proxy without any extra configuration.
       AUTH_TRUST_HOST: "true"
-      AI_MODE: "mock"
-      AI_PROVIDER: "anthropic"
+      # AI layer — Mock by default. To use real AI, create a .env file next to
+      # this docker-compose.yml (see .env.example) with at least:
+      #   AI_MODE=real
+      #   ANTHROPIC_API_KEY=sk-ant-...
+      # Compose substitutes these ${...} values from that .env automatically.
+      AI_MODE: "${AI_MODE:-mock}"
+      AI_PROVIDER: "${AI_PROVIDER:-anthropic}"
+      AI_MODEL: "${AI_MODEL:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
     ports:
       - "3000:3000"
 
