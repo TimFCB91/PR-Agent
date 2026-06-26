@@ -8,6 +8,7 @@ import {
   Input,
   Label,
   Textarea,
+  Select,
   Button,
   LinkButton,
   FieldError,
@@ -15,12 +16,25 @@ import {
 
 type Action = (prev: FormState, formData: FormData) => Promise<FormState>;
 
+function toDateInput(value?: Date | string | null): string {
+  if (!value) return "";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
 export interface ClientFormValues {
   name?: string;
   contactEmail?: string | null;
   contactPhone?: string | null;
   website?: string | null;
   notes?: string | null;
+  package?: string | null;
+  responsiblePerson?: string | null;
+  onboardingDate?: Date | string | null;
+  placementGoal?: number | null;
+  tier?: string | null;
+  status?: string | null;
 }
 
 export function ClientForm({
@@ -47,23 +61,87 @@ export function ClientForm({
           <Input id="name" name="name" defaultValue={defaults?.name ?? ""} required />
           <FieldError messages={state.fieldErrors?.name} />
         </div>
-        <div>
-          <Label htmlFor="contactEmail">Kontakt-E-Mail</Label>
-          <Input
-            id="contactEmail"
-            name="contactEmail"
-            type="email"
-            defaultValue={defaults?.contactEmail ?? ""}
-          />
-          <FieldError messages={state.fieldErrors?.contactEmail} />
+
+        {/* Account management — fills the master overview */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="package">Paket / Leistung</Label>
+            <Input
+              id="package"
+              name="package"
+              placeholder="z. B. Online Medien Boost"
+              defaultValue={defaults?.package ?? ""}
+            />
+          </div>
+          <div>
+            <Label htmlFor="responsiblePerson">Zuständig</Label>
+            <Input
+              id="responsiblePerson"
+              name="responsiblePerson"
+              placeholder="z. B. Petra"
+              defaultValue={defaults?.responsiblePerson ?? ""}
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <Label htmlFor="onboardingDate">Onboarding-Datum</Label>
+            <Input
+              id="onboardingDate"
+              name="onboardingDate"
+              type="date"
+              defaultValue={toDateInput(defaults?.onboardingDate)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="placementGoal">Zusagenziel</Label>
+            <Input
+              id="placementGoal"
+              name="placementGoal"
+              type="number"
+              min={0}
+              placeholder="z. B. 10"
+              defaultValue={defaults?.placementGoal ?? ""}
+            />
+          </div>
+          <div>
+            <Label htmlFor="tier">Stufe</Label>
+            <Select id="tier" name="tier" defaultValue={defaults?.tier ?? ""}>
+              <option value="">—</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+            </Select>
+          </div>
         </div>
         <div>
-          <Label htmlFor="contactPhone">Telefon</Label>
-          <Input
-            id="contactPhone"
-            name="contactPhone"
-            defaultValue={defaults?.contactPhone ?? ""}
-          />
+          <Label htmlFor="status">Status</Label>
+          <Select id="status" name="status" defaultValue={defaults?.status ?? "ACTIVE"}>
+            <option value="ACTIVE">Aktiv</option>
+            <option value="PAUSED">Pausiert</option>
+            <option value="ENDED">Beendet</option>
+          </Select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="contactEmail">Kontakt-E-Mail</Label>
+            <Input
+              id="contactEmail"
+              name="contactEmail"
+              type="email"
+              defaultValue={defaults?.contactEmail ?? ""}
+            />
+            <FieldError messages={state.fieldErrors?.contactEmail} />
+          </div>
+          <div>
+            <Label htmlFor="contactPhone">Telefon</Label>
+            <Input
+              id="contactPhone"
+              name="contactPhone"
+              defaultValue={defaults?.contactPhone ?? ""}
+            />
+          </div>
         </div>
         <div>
           <Label htmlFor="website">Website</Label>

@@ -68,6 +68,15 @@ export const clientSchema = z.object({
   contactPhone: optionalString,
   website: optionalString,
   notes: optionalString,
+  package: optionalString,
+  responsiblePerson: optionalString,
+  onboardingDate: optionalDate,
+  placementGoal: optionalInt,
+  tier: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.enum(["A", "B", "C"]).optional(),
+  ),
+  status: z.enum(["ACTIVE", "PAUSED", "ENDED"]).default("ACTIVE"),
 });
 
 // Campaign -------------------------------------------------------------------

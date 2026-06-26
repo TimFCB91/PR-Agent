@@ -70,6 +70,12 @@ async function main() {
       contactPhone: "+49 30 0000001",
       website: "https://nordwind.test",
       notes: "Fiktiver Kunde – E-Mobilität.",
+      package: "Online Medien Boost",
+      responsiblePerson: "Petra",
+      onboardingDate: new Date("2026-02-01"),
+      placementGoal: 10,
+      tier: "A",
+      status: "ACTIVE",
     },
   });
 
@@ -80,6 +86,12 @@ async function main() {
       contactEmail: "media@helios.test",
       website: "https://helios.test",
       notes: "Fiktiver Kunde – Lebensmittel-Startup.",
+      package: "2 Monate Agentur",
+      responsiblePerson: "Matthius",
+      onboardingDate: new Date("2026-03-15"),
+      placementGoal: 6,
+      tier: "B",
+      status: "ACTIVE",
     },
   });
 

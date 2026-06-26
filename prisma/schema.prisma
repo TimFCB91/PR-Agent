@@ -128,6 +128,13 @@ enum OutreachChannel {
   OTHER
 }
 
+// Engagement status of a client account.
+enum ClientStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
 enum RawInputSourceType {
   NOTE
   WEBSITE
@@ -289,19 +296,26 @@ model User {
 // ----------------------------------------------------------------------------
 
 model Client {
-  id             String   @id @default(cuid())
-  name           String
-  contactEmail   String?
-  contactPhone   String?
-  website        String?
-  notes          String?
+  id                String           @id @default(cuid())
+  name              String
+  contactEmail      String?
+  contactPhone      String?
+  website           String?
+  notes             String?
+  // Account management (the agency's master client overview).
+  package           String? // gebuchtes Paket / Leistung
+  responsiblePerson String? // zuständige Person
+  onboardingDate    DateTime? // Start / Onboarding
+  placementGoal     Int? // Zusagenziel (Anzahl Platzierungen)
+  tier              ContactPriority? // Kundenstufe A/B/C
+  status            ClientStatus     @default(ACTIVE)
   // Internal topic pool: a special "client" that only holds imported pool
   // topics (e.g. from Trello). Excluded from the normal client list and from
   // matching candidates.
-  isTopicPool    Boolean  @default(false)
-  organizationId String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  isTopicPool       Boolean          @default(false)
+  organizationId    String
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   campaigns          Campaign[]

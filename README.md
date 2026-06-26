@@ -38,6 +38,13 @@ Briefings und Artikelentwürfe bis zu Outreach, Veröffentlichungen und Reportin
   Briefings, Artikel (inkl. Volltext), Pitches/Outreach, Medienkontakte,
   Veröffentlichungen – lässt sich nachträglich über ein „✎ Bearbeiten"-Panel
   anpassen. KI-Vorschläge sind nur Startpunkte, nichts ist fix.
+- **Kundenübersicht (Master-Liste)**: Eigener Menüpunkt „Übersicht" – alle
+  Kunden auf einen Blick mit Paket/Leistung, Zuständigkeit, Onboarding-Datum,
+  Stufe (A/B/C) und Status. **Zusagen** (positive Outreach-Reaktionen) und
+  **Veröffentlichungen** (Anzahl + letztes Datum) sowie offene Follow-ups werden
+  **automatisch** aus den vorhandenen Daten berechnet – keine separate
+  Excel-Pflege mehr. Kunden tragen dafür neue Felder (`package`,
+  `responsiblePerson`, `onboardingDate`, `placementGoal`, `tier`, `status`).
 - **Themen-Matching (Kunden ↔ Thema)**: Pro Themenidee zeigt die App, welche
   Kunden der Organisation am besten passen (Score + Begründung aus dem
   Wissens-Layer). Hilft, ein Thema dem richtigen Experten zuzuordnen oder ein
