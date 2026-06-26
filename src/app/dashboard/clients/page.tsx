@@ -5,6 +5,7 @@ import { requireTenant, canWrite } from "@/lib/tenant";
 import { deleteClientAction } from "@/actions/clients";
 import { DeleteButton } from "@/components/delete-button";
 import { Card, PageHeader, LinkButton, EmptyState } from "@/components/ui";
+import { ClientsImportForm } from "./clients-import-form";
 
 export default async function ClientsPage() {
   const { organizationId, role } = await requireTenant();
@@ -27,6 +28,12 @@ export default async function ClientsPage() {
           )
         }
       />
+
+      {writable && (
+        <div className="mb-6">
+          <ClientsImportForm />
+        </div>
+      )}
 
       {clients.length === 0 ? (
         <EmptyState message="Noch keine Kunden angelegt." />
