@@ -135,6 +135,14 @@ enum ClientStatus {
   ENDED
 }
 
+// "Who is currently on the ball" for an outreach. NONE = derive from status.
+enum OutreachWaitingOn {
+  NONE
+  AGENCY
+  CLIENT
+  MEDIA
+}
+
 enum RawInputSourceType {
   NOTE
   WEBSITE
@@ -423,6 +431,7 @@ model Outreach {
   // Operative steering — how it was sent and the explicit next step.
   channel            OutreachChannel?
   nextStep           String?
+  waitingOn          OutreachWaitingOn @default(NONE)
   // Media intelligence — captured response signals.
   responseReceivedAt DateTime?
   responseType       ResponseType?

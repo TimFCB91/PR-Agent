@@ -139,6 +139,7 @@ export const outreachSchema = z.object({
     (v) => (v === "" || v == null ? undefined : v),
     z.enum(["ZIMPEL", "GMAIL", "OUTLOOK", "PHONE", "OTHER"]).optional(),
   ),
+  waitingOn: z.enum(["NONE", "AGENCY", "CLIENT", "MEDIA"]).default("NONE"),
   // Media intelligence — captured response signals.
   responseReceivedAt: optionalDate,
   responseType: z.preprocess(

@@ -6,6 +6,7 @@ import {
   ACCEPTED_STATUSES,
   shouldFollowUp,
 } from "@/lib/outreach/outreachManager";
+import { effectiveWaitingOn } from "@/lib/outreach/labels";
 import { Card, PageHeader, EmptyState, Badge } from "@/components/ui";
 
 const th =
@@ -46,6 +47,7 @@ export default async function UebersichtPage() {
       where: { organizationId },
       select: {
         status: true,
+        waitingOn: true,
         sentAt: true,
         nextFollowUpDate: true,
         responseReceivedAt: true,
@@ -66,11 +68,16 @@ export default async function UebersichtPage() {
   // Aggregate outreach signals per client.
   const zusagen = new Map<string, number>();
   const followUps = new Map<string, number>();
+  const waitClient = new Map<string, number>();
+  const waitMedia = new Map<string, number>();
   for (const o of outreaches) {
     const cid = o.campaign.clientId;
     if (ACCEPTED_STATUSES.includes(o.status)) {
       zusagen.set(cid, (zusagen.get(cid) ?? 0) + 1);
     }
+    const wait = effectiveWaitingOn(o);
+    if (wait === "CLIENT") waitClient.set(cid, (waitClient.get(cid) ?? 0) + 1);
+    if (wait === "MEDIA") waitMedia.set(cid, (waitMedia.get(cid) ?? 0) + 1);
     if (
       shouldFollowUp({
         status: o.status,
@@ -118,6 +125,8 @@ export default async function UebersichtPage() {
                 <th className={th}>Zuständig</th>
                 <th className={th}>Onboarding</th>
                 <th className={th}>Zusagen</th>
+                <th className={th}>Wartet auf Kunde</th>
+                <th className={th}>Wartet auf Medium</th>
                 <th className={th}>Veröffentlicht</th>
                 <th className={th}>Letzte Veröff.</th>
                 <th className={th}>Follow-ups offen</th>
@@ -153,6 +162,8 @@ export default async function UebersichtPage() {
                         <span className="text-gray-400"> / {goal}</span>
                       )}
                     </td>
+                    <td className={td}>{waitClient.get(c.id) ?? 0}</td>
+                    <td className={td}>{waitMedia.get(c.id) ?? 0}</td>
                     <td className={td}>{pub?.count ?? 0}</td>
                     <td className={td}>{fmtDate(pub?.last)}</td>
                     <td className={td}>

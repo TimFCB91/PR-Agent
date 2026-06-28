@@ -62,6 +62,12 @@ Briefings und Artikelentwürfe bis zu Outreach, Veröffentlichungen und Reportin
   Kunde einen Tab **„Pool-Themen"** mit den für ihn passendsten Themen. Der Pool
   ist ein interner, nicht browsebarer Sammel-„Kunde" (`isTopicPool`), aus dem
   Client-Listen und Matching-Kandidaten ausgeschlossen.
+- **Status & „Wer ist am Zug?"**: Jede Outreach hat einen deutschsprachigen
+  Status (Entwurf → Gesendet → Follow-up fällig → Interesse → Zusage → Artikel
+  geliefert → Veröffentlicht / Abgelehnt) und ein Feld **„Wer ist am Zug?"**
+  (Wir / Kunde / Medium – automatisch aus dem Status ableitbar). Die
+  Outreach-Liste zeigt eine **Pipeline** (am Zug: Wir / Kunde / Medium, Zusagen,
+  veröffentlicht); die Kundenübersicht zeigt „wartet auf Kunde/Medium" je Kunde.
 - **Operative Follow-up-Steuerung**:
   - Tagesliste **„Fällige Follow-ups"** (eigener Menüpunkt) – zeigt nur
     Kontakte mit Handlungsbedarf (Erstmail raus, keine Antwort, Datum erreicht,

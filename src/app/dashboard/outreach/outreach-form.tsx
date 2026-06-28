@@ -51,6 +51,7 @@ export interface OutreachFormValues {
   internalNotes?: string | null;
   nextStep?: string | null;
   channel?: string | null;
+  waitingOn?: string | null;
   responseReceivedAt?: Date | string | null;
   responseType?: string | null;
   responseSummary?: string | null;
@@ -257,6 +258,19 @@ export function OutreachForm({
               defaultValue={defaults?.nextStep ?? ""}
             />
           </div>
+        </div>
+        <div>
+          <Label htmlFor="waitingOn">Wer ist am Zug?</Label>
+          <Select
+            id="waitingOn"
+            name="waitingOn"
+            defaultValue={defaults?.waitingOn ?? "NONE"}
+          >
+            <option value="NONE">Automatisch (aus Status)</option>
+            <option value="AGENCY">Wir (Agentur)</option>
+            <option value="CLIENT">Kunde</option>
+            <option value="MEDIA">Medium</option>
+          </Select>
         </div>
         <div>
           <Label htmlFor="internalNotes">Interne Notizen</Label>

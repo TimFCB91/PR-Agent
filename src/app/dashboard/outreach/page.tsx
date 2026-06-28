@@ -7,6 +7,12 @@ import { DeleteButton } from "@/components/delete-button";
 import { ActionButton } from "@/components/action-button";
 import { FollowUpControl } from "./follow-up-control";
 import {
+  statusLabel,
+  effectiveWaitingOn,
+  waitingOnLabel,
+} from "@/lib/outreach/labels";
+import { ACCEPTED_STATUSES } from "@/lib/outreach/outreachManager";
+import {
   Card,
   PageHeader,
   LinkButton,
@@ -50,6 +56,40 @@ export default async function OutreachPage() {
         }
       />
 
+      {outreaches.length > 0 && (
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <PipeKpi
+            label="Am Zug: Wir"
+            value={
+              outreaches.filter((o) => effectiveWaitingOn(o) === "AGENCY").length
+            }
+          />
+          <PipeKpi
+            label="Wartet auf Kunde"
+            value={
+              outreaches.filter((o) => effectiveWaitingOn(o) === "CLIENT").length
+            }
+          />
+          <PipeKpi
+            label="Wartet auf Medium"
+            value={
+              outreaches.filter((o) => effectiveWaitingOn(o) === "MEDIA").length
+            }
+          />
+          <PipeKpi
+            label="Zusagen"
+            value={
+              outreaches.filter((o) => ACCEPTED_STATUSES.includes(o.status))
+                .length
+            }
+          />
+          <PipeKpi
+            label="Veröffentlicht"
+            value={outreaches.filter((o) => o.status === "PUBLISHED").length}
+          />
+        </div>
+      )}
+
       {outreaches.length === 0 ? (
         <EmptyState message="Noch keine Outreach-Einträge angelegt." />
       ) : (
@@ -61,6 +101,7 @@ export default async function OutreachPage() {
                 <th className="px-5 py-3 font-medium">Kampagne</th>
                 <th className="px-5 py-3 font-medium">Kontakt</th>
                 <th className="px-5 py-3 font-medium">Status</th>
+                <th className="px-5 py-3 font-medium">Am Zug</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>
@@ -75,7 +116,10 @@ export default async function OutreachPage() {
                     {o.mediaContact.firstName} {o.mediaContact.lastName}
                   </td>
                   <td className="px-5 py-3">
-                    <Badge value={o.status} />
+                    <Badge value={statusLabel(o.status)} />
+                  </td>
+                  <td className="px-5 py-3 text-gray-600">
+                    {waitingOnLabel(effectiveWaitingOn(o))}
                   </td>
                   <td className="px-5 py-3">
                     {writable && (
@@ -106,5 +150,14 @@ export default async function OutreachPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+function PipeKpi({ label, value }: { label: string; value: number }) {
+  return (
+    <Card className="p-3">
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-gray-900">{value}</p>
+    </Card>
   );
 }
