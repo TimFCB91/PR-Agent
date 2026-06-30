@@ -213,6 +213,25 @@ export const insightSchema = z.object({
   status: z.enum(["DRAFT", "APPROVED", "REJECTED"]),
 });
 
+// Placement (media-placement slot) -------------------------------------------
+
+export const placementSchema = z.object({
+  position: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v === "" || v === undefined ? 1 : Number(v)))
+    .refine((v) => Number.isInteger(v) && v >= 1 && v <= 1000, {
+      message: "Position 1–1000.",
+    }),
+  type: optionalString,
+  state: z.enum(["OPEN", "ACCEPTED", "PUBLISHED", "REJECTED"]),
+  medium: optionalString,
+  contactEmail: optionalString,
+  publicationUrl: optionalString,
+  note: optionalString,
+});
+
 // ClientKnowledge (manual entries) -------------------------------------------
 
 export const knowledgeSchema = z.object({

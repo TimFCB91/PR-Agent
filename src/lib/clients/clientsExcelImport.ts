@@ -36,6 +36,37 @@ export interface ParsedClientRow {
   email?: string;
   phone?: string;
   notes?: string;
+  placements: ParsedPlacement[];
+}
+
+export type ParsedPlacementState = "OPEN" | "ACCEPTED" | "PUBLISHED" | "REJECTED";
+
+export interface ParsedPlacement {
+  position: number;
+  type?: string;
+  state: ParsedPlacementState;
+  medium?: string;
+  publicationUrl?: string;
+}
+
+/** First placement-status column (codes P/GZ/IZ… with the URL in the comment). */
+const PLACEMENT_COL_START = 13;
+
+function domainOf(url: string): string | undefined {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return undefined;
+  }
+}
+
+/** Legend/helper rows that are not real clients. */
+export function isLegendRow(name: string): boolean {
+  if (name.includes(" = ")) return true;
+  if (name.length > 45) return true;
+  return /^(veröffentlicht|zusage erhalten|zusage abge|warte auf|vorlage|wenn auf diese)/i.test(
+    name,
+  );
 }
 
 function str(v: unknown): string {
@@ -152,6 +183,7 @@ export function parseClientsExcel(buffer: ArrayBuffer): ParsedClientRow[] {
     }
 
     if (/^(name|kunde|kunden)$/i.test(name)) continue;
+    if (isLegendRow(name)) continue; // legend/helper rows, not clients
     const key = name.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -175,6 +207,23 @@ export function parseClientsExcel(buffer: ArrayBuffer): ParsedClientRow[] {
     const email = extractEmail(nameComment) || extractEmail(urls.join(" "));
     const phone = extractPhone(nameComment);
 
+    // Placement slots: the code is the cell value (P/GZ/IZ/L…), the published
+    // URL is the cell comment. Empty cells are open slots (no record).
+    const placements: ParsedPlacement[] = [];
+    for (let c = PLACEMENT_COL_START; c <= range.e.c; c++) {
+      const code = str(row[c]).trim();
+      const cUrl = (commentAt(sheet, excelR, c).match(/https?:\/\/\S+/) ?? [])[0];
+      if (!code && !cUrl) continue;
+      placements.push({
+        position: placements.length + 1,
+        type: code || undefined,
+        state: cUrl ? "PUBLISHED" : "ACCEPTED",
+        medium: cUrl ? domainOf(cUrl) : undefined,
+        publicationUrl: cUrl,
+      });
+      if (placements.length >= 80) break;
+    }
+
     // Keep everything: short note + the full name comment + the placement URLs.
     const noteParts = [
       str(row[COL.note]).trim(),
@@ -193,6 +242,7 @@ export function parseClientsExcel(buffer: ArrayBuffer): ParsedClientRow[] {
       email,
       phone,
       notes: noteParts.length ? noteParts.join("\n\n") : undefined,
+      placements,
     });
   }
 

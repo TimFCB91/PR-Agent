@@ -135,6 +135,14 @@ enum ClientStatus {
   ENDED
 }
 
+// State of a single guaranteed media placement slot.
+enum PlacementState {
+  OPEN // noch offen (grau)
+  ACCEPTED // Zusage, noch nicht veröffentlicht (gelb)
+  PUBLISHED // veröffentlicht (grün)
+  REJECTED // trotz Zusage abgesagt / vom Kunden abgelehnt (rot)
+}
+
 // "Who is currently on the ball" for an outreach. NONE = derive from status.
 enum OutreachWaitingOn {
   NONE
@@ -280,6 +288,7 @@ model Organization {
   journalistPreferences JournalistPreference[]
   mediaImportSessions   MediaImportSession[]
   mediaResearchResults  MediaResearchResult[]
+  placements            Placement[]
 }
 
 model User {
@@ -338,6 +347,7 @@ model Client {
   knowledgeEdges     KnowledgeEdge[]
   knowledgeDocuments KnowledgeDocument[]
   knowledgeChunks    KnowledgeChunk[]
+  placements         Placement[]
 
   @@index([organizationId])
 }
@@ -619,6 +629,29 @@ model Publication {
   @@index([organizationId])
   @@index([clientId])
   @@index([campaignId])
+}
+
+// A single guaranteed media-placement slot for a client (the colored boxes).
+model Placement {
+  id             String         @id @default(cuid())
+  position       Int // slot number (1..placementGoal)
+  type           String? // GZ, IZ, P, P+, L … (Gastbeitrag/Interview/Presse…)
+  state          PlacementState @default(OPEN)
+  medium         String? // outlet / medium
+  contactEmail   String?
+  publicationUrl String?
+  publishedAt    DateTime?
+  note           String?
+  clientId       String
+  organizationId String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([clientId])
 }
 
 // 10. Writing rule sets used to constrain article generation later.

@@ -76,6 +76,12 @@ import {
 import { RawInputForm } from "./_forms/raw-input-form";
 import { RawFileImportForm } from "./_forms/raw-file-import-form";
 import { KnowledgeForm } from "./_forms/knowledge-form";
+import { PlacementForm } from "./_forms/placement-form";
+import {
+  createPlacementAction,
+  updatePlacementAction,
+  deletePlacementAction,
+} from "@/actions/placements";
 import { InsightForm } from "./_forms/insight-form";
 import { TopicForm } from "./_forms/topic-form";
 import { BriefingForm } from "./_forms/briefing-form";
@@ -95,6 +101,7 @@ const TABS = [
   { key: "outreach", label: "Outreach" },
   { key: "briefings", label: "Briefings" },
   { key: "articles", label: "Artikel" },
+  { key: "placements", label: "Platzierungen" },
   { key: "publications", label: "Veröffentlichungen" },
 ] as const;
 
@@ -211,6 +218,13 @@ export default async function ClientDetailPage({
       )}
       {activeTab === "articles" && (
         <ArticlesTab
+          clientId={id}
+          organizationId={organizationId}
+          writable={writable}
+        />
+      )}
+      {activeTab === "placements" && (
+        <PlacementsTab
           clientId={id}
           organizationId={organizationId}
           writable={writable}
@@ -1065,6 +1079,233 @@ async function PoolMatchTab({
                     {r.matchedTerms.length > 0 ? r.matchedTerms.join(", ") : "—"}
                   </td>
                 </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+const PLACEMENT_STATE_LABEL: Record<string, string> = {
+  OPEN: "Offen",
+  ACCEPTED: "Zusage (wartet auf Veröffentlichung)",
+  PUBLISHED: "Veröffentlicht",
+  REJECTED: "Abgesagt / abgelehnt",
+};
+
+async function PlacementsTab({
+  clientId,
+  organizationId,
+  writable,
+}: {
+  clientId: string;
+  organizationId: string;
+  writable: boolean;
+}) {
+  const [client, placements] = await Promise.all([
+    prisma.client.findFirst({
+      where: { id: clientId, organizationId },
+      select: { placementGoal: true },
+    }),
+    prisma.placement.findMany({
+      where: { clientId, organizationId },
+      orderBy: { position: "asc" },
+    }),
+  ]);
+
+  const goal = client?.placementGoal ?? 0;
+  const maxPos = placements.reduce((m, p) => Math.max(m, p.position), 0);
+  const count = Math.max(goal, maxPos, placements.length);
+  const byPos = new Map(placements.map((p) => [p.position, p]));
+
+  const published = placements.filter((p) => p.state === "PUBLISHED").length;
+  const accepted = placements.filter((p) => p.state === "ACCEPTED").length;
+  const rejected = placements.filter((p) => p.state === "REJECTED").length;
+
+  const boxClass = (state?: string) =>
+    !state || state === "OPEN"
+      ? "bg-gray-50 text-gray-400 border-gray-200"
+      : state === "ACCEPTED"
+        ? "bg-yellow-100 text-yellow-900 border-yellow-300"
+        : state === "PUBLISHED"
+          ? "bg-green-100 text-green-900 border-green-300"
+          : "bg-red-100 text-red-900 border-red-300";
+
+  const addAction = createPlacementAction.bind(null, clientId);
+
+  return (
+    <div className="space-y-6">
+      <p className="text-sm text-gray-500">
+        {count} zugesicherte Platzierung{count === 1 ? "" : "en"} ·{" "}
+        <span className="text-green-700">{published} veröffentlicht</span> ·{" "}
+        <span className="text-yellow-700">{accepted} zugesagt (offen)</span>
+        {rejected > 0 && (
+          <>
+            {" "}
+            · <span className="text-red-700">{rejected} abgesagt</span>
+          </>
+        )}
+      </p>
+
+      {count === 0 ? (
+        <EmptyState message="Noch keine Platzierungen. Lege unten welche an oder importiere die Kundenliste." />
+      ) : (
+        <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10">
+          {Array.from({ length: count }, (_, k) => k + 1).map((pos) => {
+            const p = byPos.get(pos);
+            const label =
+              p?.type ||
+              (p
+                ? p.state === "PUBLISHED"
+                  ? "✓"
+                  : p.state === "REJECTED"
+                    ? "✕"
+                    : "•"
+                : "offen");
+            const tip = p
+              ? [
+                  `#${pos} · ${PLACEMENT_STATE_LABEL[p.state] ?? p.state}`,
+                  p.medium && `Medium: ${p.medium}`,
+                  p.contactEmail && `Kontakt: ${p.contactEmail}`,
+                  p.publicationUrl && `Link: ${p.publicationUrl}`,
+                  p.note && `Notiz: ${p.note}`,
+                ]
+                  .filter(Boolean)
+                  .join("\n")
+              : `#${pos} · offen`;
+            const inner = (
+              <div
+                title={tip}
+                className={`flex h-16 flex-col items-center justify-center rounded-md border text-xs font-medium ${boxClass(
+                  p?.state,
+                )}`}
+              >
+                <span className="text-[10px] opacity-60">{pos}</span>
+                <span className="px-1 text-center leading-tight">{label}</span>
+              </div>
+            );
+            return p?.publicationUrl ? (
+              <a
+                key={pos}
+                href={p.publicationUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {inner}
+              </a>
+            ) : (
+              <div key={pos}>{inner}</div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+        <span><span className="mr-1 inline-block h-3 w-3 rounded-sm border border-gray-200 bg-gray-50 align-middle" />offen</span>
+        <span><span className="mr-1 inline-block h-3 w-3 rounded-sm border border-yellow-300 bg-yellow-100 align-middle" />Zusage (wartet auf Veröffentlichung)</span>
+        <span><span className="mr-1 inline-block h-3 w-3 rounded-sm border border-green-300 bg-green-100 align-middle" />veröffentlicht</span>
+        <span><span className="mr-1 inline-block h-3 w-3 rounded-sm border border-red-300 bg-red-100 align-middle" />abgesagt / abgelehnt</span>
+      </div>
+
+      {writable && (
+        <details>
+          <summary className="cursor-pointer text-sm font-medium text-gray-700">
+            ＋ Neue Platzierung
+          </summary>
+          <div className="mt-3 max-w-2xl">
+            <PlacementForm
+              action={addAction}
+              defaults={{ position: count + 1, state: "OPEN" }}
+            />
+          </div>
+        </details>
+      )}
+
+      {placements.length > 0 && (
+        <Card className="overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="border-b border-gray-200 bg-gray-50 text-left">
+              <tr>
+                <th className={th}>Nr.</th>
+                <th className={th}>Art</th>
+                <th className={th}>Status</th>
+                <th className={th}>Medium</th>
+                <th className={th}>Link</th>
+                <th className={th} />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {placements.map((p) => (
+                <Fragment key={p.id}>
+                  <tr className="hover:bg-gray-50">
+                    <td className={td}>{p.position}</td>
+                    <td className={td}>{p.type ?? "—"}</td>
+                    <td className={td}>
+                      <Badge value={PLACEMENT_STATE_LABEL[p.state] ?? p.state} />
+                    </td>
+                    <td className={td}>{p.medium ?? "—"}</td>
+                    <td className={td}>
+                      {p.publicationUrl ? (
+                        <a
+                          href={p.publicationUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-700 underline"
+                        >
+                          Link
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      {writable && (
+                        <div className="flex items-center justify-end">
+                          <DeleteButton
+                            id={p.id}
+                            action={deletePlacementAction}
+                            extraFields={{ clientId }}
+                          />
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  {writable && (
+                    <tr>
+                      <td colSpan={6} className="px-5 pb-4">
+                        <details>
+                          <summary className="cursor-pointer text-sm font-medium text-gray-600">
+                            ✎ Bearbeiten
+                          </summary>
+                          <div className="mt-3 max-w-2xl">
+                            <PlacementForm
+                              action={updatePlacementAction.bind(
+                                null,
+                                clientId,
+                                p.id,
+                              )}
+                              submitLabel="Änderungen speichern"
+                              defaults={{
+                                position: p.position,
+                                type: p.type,
+                                state: p.state,
+                                medium: p.medium,
+                                contactEmail: p.contactEmail,
+                                publicationUrl: p.publicationUrl,
+                                note: p.note,
+                              }}
+                            />
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>

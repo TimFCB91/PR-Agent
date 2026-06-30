@@ -5,11 +5,12 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireWriteAccess, AccessDeniedError } from "@/lib/tenant";
 import type { FormState } from "@/lib/form";
-import { parseClientsExcel } from "@/lib/clients/clientsExcelImport";
+import { parseClientsExcel, isLegendRow } from "@/lib/clients/clientsExcelImport";
 
 export interface ClientsImportState extends FormState {
   imported?: number;
   updated?: number;
+  removed?: number;
   total?: number;
 }
 
@@ -51,19 +52,43 @@ export async function importClientsExcelAction(
 
   let created = 0;
   let updated = 0;
+  let removed = 0;
   try {
+    const org = tenant.organizationId;
+
     // Map existing client names -> id (skip the internal topic pool).
     const existing = await prisma.client.findMany({
-      where: { organizationId: tenant.organizationId, isTopicPool: false },
+      where: { organizationId: org, isTopicPool: false },
       select: { id: true, name: true },
     });
+
+    // Clean up legend/helper rows that an earlier import created as clients.
+    const legendIds = existing
+      .filter((c) => isLegendRow(c.name))
+      .map((c) => c.id);
+    if (legendIds.length > 0) {
+      const del = await prisma.client.deleteMany({
+        where: { id: { in: legendIds }, organizationId: org },
+      });
+      removed = del.count;
+    }
     const idByName = new Map(
       existing.map((c) => [c.name.trim().toLowerCase(), c.id]),
     );
 
-    const toCreate: Array<Record<string, unknown>> = [];
+    // Clients that already have placements — never overwrite those (the user
+    // may have edited them in the app).
+    const withPlacements = new Set(
+      (
+        await prisma.placement.findMany({
+          where: { organizationId: org },
+          distinct: ["clientId"],
+          select: { clientId: true },
+        })
+      ).map((p) => p.clientId),
+    );
+
     for (const r of rows) {
-      const id = idByName.get(r.name.trim().toLowerCase());
       const data = {
         tier: r.tier,
         package: r.package,
@@ -77,21 +102,35 @@ export async function importClientsExcelAction(
         ...(r.phone ? { contactPhone: r.phone } : {}),
         ...(r.notes ? { notes: r.notes } : {}),
       };
-      if (id) {
-        await prisma.client.update({ where: { id }, data });
+
+      let clientId = idByName.get(r.name.trim().toLowerCase());
+      if (clientId) {
+        await prisma.client.update({ where: { id: clientId }, data });
         updated++;
       } else {
-        toCreate.push({
-          organizationId: tenant.organizationId,
-          name: r.name,
-          ...data,
+        const c = await prisma.client.create({
+          data: { organizationId: org, name: r.name, ...data },
+          select: { id: true },
         });
+        clientId = c.id;
+        created++;
       }
-    }
 
-    if (toCreate.length > 0) {
-      await prisma.client.createMany({ data: toCreate as never });
-      created = toCreate.length;
+      // Seed placements once (only if the client has none yet).
+      if (r.placements.length > 0 && !withPlacements.has(clientId)) {
+        await prisma.placement.createMany({
+          data: r.placements.map((p) => ({
+            organizationId: org,
+            clientId: clientId as string,
+            position: p.position,
+            type: p.type,
+            state: p.state,
+            medium: p.medium,
+            publicationUrl: p.publicationUrl,
+          })),
+        });
+        withPlacements.add(clientId);
+      }
     }
   } catch (e) {
     return {
@@ -104,5 +143,5 @@ export async function importClientsExcelAction(
 
   revalidatePath("/dashboard/clients");
   revalidatePath("/dashboard/uebersicht");
-  return { ok: true, total: rows.length, imported: created, updated };
+  return { ok: true, total: rows.length, imported: created, updated, removed };
 }

@@ -53,7 +53,9 @@ export function ClientsImportForm() {
       {state.ok && (
         <p className="mt-3 rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
           {state.imported ?? 0} neu importiert, {state.updated ?? 0}{" "}
-          aktualisiert. Gesamt erkannt: {state.total ?? 0}.
+          aktualisiert
+          {state.removed ? `, ${state.removed} Legenden-Zeilen entfernt` : ""}.
+          Gesamt erkannt: {state.total ?? 0}.
         </p>
       )}
     </Card>

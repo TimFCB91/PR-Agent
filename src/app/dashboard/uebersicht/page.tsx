@@ -29,7 +29,7 @@ const STATUS_LABEL: Record<string, string> = {
 export default async function UebersichtPage() {
   const { organizationId } = await requireTenant();
 
-  const [clients, pubAgg, outreaches] = await Promise.all([
+  const [clients, pubAgg, outreaches, placements] = await Promise.all([
     prisma.client.findMany({
       where: { organizationId, isTopicPool: false },
       orderBy: [{ status: "asc" }, { name: "asc" }],
@@ -55,6 +55,11 @@ export default async function UebersichtPage() {
         campaign: { select: { clientId: true } },
         mediaContact: { select: { doNotContact: true, relationship: true } },
       },
+    }),
+    // Placements (the colored-box tracker / imported data).
+    prisma.placement.findMany({
+      where: { organizationId },
+      select: { clientId: true, state: true },
     }),
   ]);
 
@@ -93,9 +98,26 @@ export default async function UebersichtPage() {
     }
   }
 
+  // Placements per client: a Zusage = accepted or published; published = grün.
+  const placedPublished = new Map<string, number>();
+  for (const p of placements) {
+    const cid = p.clientId;
+    if (p.state === "ACCEPTED" || p.state === "PUBLISHED") {
+      zusagen.set(cid, (zusagen.get(cid) ?? 0) + 1);
+    }
+    if (p.state === "PUBLISHED") {
+      placedPublished.set(cid, (placedPublished.get(cid) ?? 0) + 1);
+    }
+  }
+  // Combined published count per client (Publication entries + placements).
+  const publishedTotal = (cid: string) =>
+    (pubByClient.get(cid)?.count ?? 0) + (placedPublished.get(cid) ?? 0);
+
   const activeCount = clients.filter((c) => c.status === "ACTIVE").length;
   const totalZusagen = [...zusagen.values()].reduce((a, b) => a + b, 0);
-  const totalPublished = pubAgg.reduce((a, p) => a + p._count._all, 0);
+  const totalPublished =
+    pubAgg.reduce((a, p) => a + p._count._all, 0) +
+    [...placedPublished.values()].reduce((a, b) => a + b, 0);
 
   return (
     <div>
@@ -164,7 +186,7 @@ export default async function UebersichtPage() {
                     </td>
                     <td className={td}>{waitClient.get(c.id) ?? 0}</td>
                     <td className={td}>{waitMedia.get(c.id) ?? 0}</td>
-                    <td className={td}>{pub?.count ?? 0}</td>
+                    <td className={td}>{publishedTotal(c.id)}</td>
                     <td className={td}>{fmtDate(pub?.last)}</td>
                     <td className={td}>
                       {open > 0 ? (
