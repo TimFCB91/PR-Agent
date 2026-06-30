@@ -59,6 +59,7 @@ import {
 import {
   rebuildKnowledgeAction,
   rebuildTopicsAction,
+  importTopicsFromFileAction,
   buildBriefingViaAgentAction,
   buildArticleViaAgentAction,
   matchAndCreateOutreachAction,
@@ -85,6 +86,7 @@ import { ReportingImportForm } from "./_forms/reporting-import-form";
 import { ArticleFileImportForm } from "./_forms/article-file-import-form";
 import { KnowledgeRebuildButton } from "./_forms/knowledge-rebuild-button";
 import { TopicsRebuildButton } from "./_forms/topics-rebuild-button";
+import { TopicFileImportForm } from "./_forms/topic-file-import-form";
 import { TopicForm } from "./_forms/topic-form";
 import { BriefingForm } from "./_forms/briefing-form";
 import { ArticleForm } from "./_forms/article-form";
@@ -805,6 +807,12 @@ async function TopicsTab({
       )}
 
       {writable && (
+        <TopicFileImportForm
+          action={importTopicsFromFileAction.bind(null, clientId)}
+        />
+      )}
+
+      {writable && (
         <details>
           <summary className="cursor-pointer text-sm font-medium text-gray-700">
             ＋ Neues Thema
@@ -815,11 +823,34 @@ async function TopicsTab({
         </details>
       )}
 
+      {writable && items.length > 0 && (
+        <div className="rounded-md bg-gray-50 px-4 py-3 text-xs text-gray-600">
+          <p className="font-medium text-gray-700">Was die Aktionen tun:</p>
+          <ul className="mt-1 space-y-0.5">
+            <li>
+              <strong>Briefing erstellen</strong> – legt aus dem Thema ein
+              Briefing an (Vorlage, ohne KI).
+            </li>
+            <li>
+              <strong>KI-Briefing</strong> – die KI schreibt das Briefing aus
+              Thema + Wissen.
+            </li>
+            <li>
+              <strong>Medien-Matching</strong> – sucht passende Medienkontakte
+              zum Thema und legt Outreach an.
+            </li>
+            <li>
+              <strong>Löschen</strong> (🗑) – entfernt das Thema.
+            </li>
+          </ul>
+        </div>
+      )}
+
       {items.length === 0 ? (
         <EmptyState message="Noch keine Themen." />
       ) : (
-        <Card className="overflow-hidden">
-          <table className="w-full text-sm">
+        <Card className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm">
             <thead className="border-b border-gray-200 bg-gray-50 text-left">
               <tr>
                 <th className={th}>Titel</th>
@@ -855,7 +886,7 @@ async function TopicsTab({
                     </td>
                     <td className="px-5 py-3">
                       {writable && (
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
                           <ActionButton
                             action={buildBriefingFromTopicAction}
                             fields={{ id: it.id, clientId }}

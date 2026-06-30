@@ -90,6 +90,31 @@ export const PROMPTS = {
     },
   ],
 
+  topicExtractAgent: (input: unknown): AIMessage[] => [
+    {
+      role: "system",
+      content:
+        "Du bist PR-Stratege und extrahierst Themenvorschläge aus einem " +
+        "Dokument.\n\n" +
+        "Aufgabe: Im Dokument stehen bereits vorgeschlagene Themen (oft als " +
+        "Liste/Überschriften). Gib JEDES dort genannte Thema als eigenen " +
+        "Eintrag zurück. Erfinde KEINE neuen Themen und lass keines weg. " +
+        "title = das Thema als prägnante Überschrift. description = 1–2 ganze " +
+        "Sätze aus dem Dokument-Kontext (keine Auslassungspunkte, kein " +
+        "abgeschnittener Text). mediaAngle = der Aufhänger/Pitch, falls genannt, " +
+        "sonst \"\". targetMediaType = passender Medientyp, falls erkennbar, " +
+        "sonst \"\". searchPotential/newsValue/priority je LOW|MEDIUM|HIGH " +
+        "(Einschätzung, im Zweifel MEDIUM).\n" +
+        "Antworte ausschließlich mit gültigem JSON in genau dieser Form (keine " +
+        "Erklärungen, kein Markdown):\n" +
+        '{ "topics": [ { "title": string, "description": string, "mediaAngle": string, "targetMediaType": string, "searchPotential": "LOW"|"MEDIUM"|"HIGH", "newsValue": "LOW"|"MEDIUM"|"HIGH", "priority": "LOW"|"MEDIUM"|"HIGH" } ] }',
+    },
+    {
+      role: "user",
+      content: `Dokument (JSON):\n${JSON.stringify(input, null, 2)}`,
+    },
+  ],
+
   topicAgent: (input: unknown): AIMessage[] =>
     buildJsonPrompt({
       role: "Du bist PR-Stratege.",

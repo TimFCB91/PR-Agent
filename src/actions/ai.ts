@@ -11,6 +11,8 @@ import {
   normaliseCategory,
 } from "@/lib/ai/agents/knowledgeAgent";
 import { runTopicAgent } from "@/lib/ai/agents/topicAgent";
+import { runTopicExtractAgent } from "@/lib/ai/agents/topicExtractAgent";
+import { extractTextFromFile } from "@/lib/files/extractText";
 import { runBriefingAgent } from "@/lib/ai/agents/briefingAgent";
 import { runArticleAgent } from "@/lib/ai/agents/articleAgent";
 import { runMediaMatchingAgent } from "@/lib/ai/agents/mediaMatchingAgent";
@@ -291,6 +293,92 @@ export async function generateTopicsFromKnowledgeAction(
 export interface TopicsBuildState extends FormState {
   created?: number;
   usedFallback?: boolean;
+}
+
+export interface TopicImportState extends TopicsBuildState {
+  fileName?: string;
+}
+
+/**
+ * Import topics from an uploaded document (Word/PDF/text): the AI extracts the
+ * topics proposed in the file and adds them as topic ideas. Imported topics are
+ * marked manual so the "neu generieren" step won't wipe them.
+ */
+export async function importTopicsFromFileAction(
+  clientId: string,
+  _prev: TopicImportState,
+  formData: FormData,
+): Promise<TopicImportState> {
+  const tenant = await requireWriteAccess();
+  const client = await getClient(clientId, tenant.organizationId);
+  if (!client) return { ok: false, error: "Kunde nicht gefunden." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Bitte eine Datei auswählen." };
+  }
+
+  let extracted;
+  try {
+    extracted = await extractTextFromFile(file);
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Datei konnte nicht gelesen werden.",
+    };
+  }
+  if (!extracted.text) {
+    return { ok: false, error: "Aus der Datei konnte kein Text gelesen werden." };
+  }
+
+  const run = await runTopicExtractAgent(
+    {
+      clientName: client.name,
+      documentTitle: extracted.fileName,
+      documentText: extracted.text.slice(0, 16000),
+    },
+    { organizationId: tenant.organizationId, userId: tenant.userId },
+  );
+
+  if (run.usedFallback && run.error) {
+    return {
+      ok: false,
+      usedFallback: true,
+      error: fallbackNotice({ usedFallback: true, error: run.error }),
+    };
+  }
+
+  const topics = run.output.topics;
+  if (topics.length === 0) {
+    return { ok: false, error: "Im Dokument wurden keine Themen gefunden." };
+  }
+
+  await prisma.topicIdea.createMany({
+    data: topics.map((t) => ({
+      clientId,
+      organizationId: tenant.organizationId,
+      title: t.title.slice(0, 200),
+      description:
+        [t.description, `Importiert aus: ${extracted.fileName}`]
+          .filter(Boolean)
+          .join("\n\n") || undefined,
+      mediaAngle: t.mediaAngle || undefined,
+      targetMediaType: t.targetMediaType || undefined,
+      searchPotential: (t.searchPotential ?? "MEDIUM") as Level,
+      newsValue: (t.newsValue ?? "MEDIUM") as Level,
+      priority: (t.priority ?? "MEDIUM") as Level,
+      status: "DRAFT" as const,
+      manual: true,
+    })),
+  });
+
+  revClient(clientId);
+  return {
+    ok: true,
+    created: topics.length,
+    usedFallback: false,
+    fileName: extracted.fileName,
+  };
 }
 
 /**
