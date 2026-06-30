@@ -50,30 +50,42 @@ export async function importClientsExcelAction(
   }
 
   // Skip names that already exist (case-insensitive), incl. the topic pool.
-  const existing = await prisma.client.findMany({
-    where: { organizationId: tenant.organizationId },
-    select: { name: true },
-  });
-  const existingNames = new Set(existing.map((c) => c.name.trim().toLowerCase()));
-
-  const toCreate = rows.filter(
-    (r) => !existingNames.has(r.name.trim().toLowerCase()),
-  );
-
-  if (toCreate.length > 0) {
-    await prisma.client.createMany({
-      data: toCreate.map((r) => ({
-        organizationId: tenant.organizationId,
-        name: r.name,
-        tier: r.tier,
-        package: r.package,
-        responsiblePerson: r.responsiblePerson,
-        onboardingDate: r.onboardingDate,
-        placementGoal: r.placementGoal,
-        notes: r.notes,
-        status: "ACTIVE" as const,
-      })),
+  let toCreate;
+  try {
+    const existing = await prisma.client.findMany({
+      where: { organizationId: tenant.organizationId },
+      select: { name: true },
     });
+    const existingNames = new Set(
+      existing.map((c) => c.name.trim().toLowerCase()),
+    );
+
+    toCreate = rows.filter(
+      (r) => !existingNames.has(r.name.trim().toLowerCase()),
+    );
+
+    if (toCreate.length > 0) {
+      await prisma.client.createMany({
+        data: toCreate.map((r) => ({
+          organizationId: tenant.organizationId,
+          name: r.name,
+          tier: r.tier,
+          package: r.package,
+          responsiblePerson: r.responsiblePerson,
+          onboardingDate: r.onboardingDate,
+          placementGoal: r.placementGoal,
+          notes: r.notes,
+          status: "ACTIVE" as const,
+        })),
+      });
+    }
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        "Import fehlgeschlagen beim Speichern: " +
+        (e instanceof Error ? e.message : String(e)),
+    };
   }
 
   revalidatePath("/dashboard/clients");
