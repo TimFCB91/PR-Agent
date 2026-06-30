@@ -102,7 +102,6 @@ const TABS = [
   { key: "briefings", label: "Briefings" },
   { key: "articles", label: "Artikel" },
   { key: "placements", label: "Platzierungen" },
-  { key: "publications", label: "Veröffentlichungen" },
 ] as const;
 
 function fmtDate(value?: Date | string | null): string {
@@ -225,13 +224,6 @@ export default async function ClientDetailPage({
       )}
       {activeTab === "placements" && (
         <PlacementsTab
-          clientId={id}
-          organizationId={organizationId}
-          writable={writable}
-        />
-      )}
-      {activeTab === "publications" && (
-        <PublicationsTab
           clientId={id}
           organizationId={organizationId}
           writable={writable}
