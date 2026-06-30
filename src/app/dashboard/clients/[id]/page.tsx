@@ -82,7 +82,9 @@ import {
   updatePlacementAction,
   deletePlacementAction,
   setPlacementGoalAction,
+  importReportingListAction,
 } from "@/actions/placements";
+import { ReportingImportForm } from "./_forms/reporting-import-form";
 import { InsightForm } from "./_forms/insight-form";
 import { TopicForm } from "./_forms/topic-form";
 import { BriefingForm } from "./_forms/briefing-form";
@@ -1250,6 +1252,14 @@ async function PlacementsTab({
         <span><span className="mr-1 inline-block h-3 w-3 rounded-sm border border-red-300 bg-red-100 align-middle" />abgesagt / abgelehnt</span>
         <span><span className="mr-1 inline-block h-3 w-3 rounded-sm ring-2 ring-purple-400 align-middle" />Bonus (über dem Ziel)</span>
       </div>
+
+      {writable && (
+        <div className="max-w-2xl">
+          <ReportingImportForm
+            action={importReportingListAction.bind(null, clientId)}
+          />
+        </div>
+      )}
 
       {writable && (
         <details>
