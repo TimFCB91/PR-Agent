@@ -6,6 +6,7 @@ import { deleteMediaContactAction } from "@/actions/media-contacts";
 import { DeleteButton } from "@/components/delete-button";
 import { Card, PageHeader, LinkButton, EmptyState, Badge } from "@/components/ui";
 import { FileImportForm } from "./file-import-form";
+import { MediaListsImportForm } from "./media-lists-import-form";
 
 export default async function MediaContactsPage() {
   const { organizationId, role } = await requireTenant();
@@ -15,12 +16,13 @@ export default async function MediaContactsPage() {
     where: { organizationId },
     orderBy: { createdAt: "desc" },
   });
+  const total = contacts.length;
 
   return (
     <div>
       <PageHeader
         title="Medienkontakte"
-        description="Journalist:innen und Redaktionen"
+        description={`${total} Kontakte · Journalist:innen, Medien, Podcasts, Radio`}
         action={
           <div className="flex gap-2">
             <LinkButton
@@ -40,7 +42,8 @@ export default async function MediaContactsPage() {
       />
 
       {writable && (
-        <div className="mb-6">
+        <div className="mb-6 space-y-4">
+          <MediaListsImportForm />
           <FileImportForm />
         </div>
       )}
