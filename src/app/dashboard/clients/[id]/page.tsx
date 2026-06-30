@@ -81,6 +81,7 @@ import {
   createPlacementAction,
   updatePlacementAction,
   deletePlacementAction,
+  setPlacementGoalAction,
 } from "@/actions/placements";
 import { InsightForm } from "./_forms/insight-form";
 import { TopicForm } from "./_forms/topic-form";
@@ -1128,12 +1129,17 @@ async function PlacementsTab({
           : "bg-red-100 text-red-900 border-red-300";
 
   const addAction = createPlacementAction.bind(null, clientId);
+  const bonus = goal > 0 ? Math.max(0, count - goal) : 0;
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-gray-500">
-        {count} zugesicherte Platzierung{count === 1 ? "" : "en"} ·{" "}
-        <span className="text-green-700">{published} veröffentlicht</span> ·{" "}
+        <span className="font-medium text-gray-900">{goal || count}</span>{" "}
+        zugesichert
+        {bonus > 0 && (
+          <span className="font-medium text-purple-700"> + {bonus} Bonus</span>
+        )}{" "}
+        · <span className="text-green-700">{published} veröffentlicht</span> ·{" "}
         <span className="text-yellow-700">{accepted} zugesagt (offen)</span>
         {rejected > 0 && (
           <>
@@ -1143,12 +1149,47 @@ async function PlacementsTab({
         )}
       </p>
 
+      {writable && (
+        <form
+          action={setPlacementGoalAction}
+          className="flex flex-wrap items-end gap-2"
+        >
+          <input type="hidden" name="clientId" value={clientId} />
+          <div>
+            <label
+              htmlFor="placementGoal"
+              className="block text-xs font-medium text-gray-600"
+            >
+              Zugesicherte Platzierungen (Ziel)
+            </label>
+            <input
+              id="placementGoal"
+              name="placementGoal"
+              type="number"
+              min={0}
+              defaultValue={goal || ""}
+              className="mt-1 w-28 rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <button
+            type="submit"
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Ziel speichern
+          </button>
+          <span className="text-xs text-gray-400">
+            Mehr Platzierungen als das Ziel zählen als „Bonus" (lila markiert).
+          </span>
+        </form>
+      )}
+
       {count === 0 ? (
         <EmptyState message="Noch keine Platzierungen. Lege unten welche an oder importiere die Kundenliste." />
       ) : (
         <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10">
           {Array.from({ length: count }, (_, k) => k + 1).map((pos) => {
             const p = byPos.get(pos);
+            const isBonus = goal > 0 && pos > goal;
             const label =
               p?.type ||
               (p
@@ -1160,7 +1201,7 @@ async function PlacementsTab({
                 : "offen");
             const tip = p
               ? [
-                  `#${pos} · ${PLACEMENT_STATE_LABEL[p.state] ?? p.state}`,
+                  `#${pos}${isBonus ? " · BONUS" : ""} · ${PLACEMENT_STATE_LABEL[p.state] ?? p.state}`,
                   p.medium && `Medium: ${p.medium}`,
                   p.contactEmail && `Kontakt: ${p.contactEmail}`,
                   p.publicationUrl && `Link: ${p.publicationUrl}`,
@@ -1168,14 +1209,19 @@ async function PlacementsTab({
                 ]
                   .filter(Boolean)
                   .join("\n")
-              : `#${pos} · offen`;
+              : `#${pos}${isBonus ? " · BONUS" : ""} · offen`;
             const inner = (
               <div
                 title={tip}
-                className={`flex h-16 flex-col items-center justify-center rounded-md border text-xs font-medium ${boxClass(
+                className={`relative flex h-16 flex-col items-center justify-center rounded-md border text-xs font-medium ${boxClass(
                   p?.state,
-                )}`}
+                )} ${isBonus ? "ring-2 ring-purple-400" : ""}`}
               >
+                {isBonus && (
+                  <span className="absolute -top-1.5 right-0.5 rounded bg-purple-600 px-1 text-[8px] font-bold text-white">
+                    BONUS
+                  </span>
+                )}
                 <span className="text-[10px] opacity-60">{pos}</span>
                 <span className="px-1 text-center leading-tight">{label}</span>
               </div>
@@ -1202,6 +1248,7 @@ async function PlacementsTab({
         <span><span className="mr-1 inline-block h-3 w-3 rounded-sm border border-yellow-300 bg-yellow-100 align-middle" />Zusage (wartet auf Veröffentlichung)</span>
         <span><span className="mr-1 inline-block h-3 w-3 rounded-sm border border-green-300 bg-green-100 align-middle" />veröffentlicht</span>
         <span><span className="mr-1 inline-block h-3 w-3 rounded-sm border border-red-300 bg-red-100 align-middle" />abgesagt / abgelehnt</span>
+        <span><span className="mr-1 inline-block h-3 w-3 rounded-sm ring-2 ring-purple-400 align-middle" />Bonus (über dem Ziel)</span>
       </div>
 
       {writable && (

@@ -73,6 +73,24 @@ export async function updatePlacementAction(
   return { ok: true };
 }
 
+/** Quick-edit the client's guaranteed placement count (Zusagenziel). */
+export async function setPlacementGoalAction(
+  formData: FormData,
+): Promise<void> {
+  const tenant = await requireWriteAccess();
+  const clientId = String(formData.get("clientId"));
+  const raw = String(formData.get("placementGoal")).trim();
+  const n = parseInt(raw, 10);
+  const goal =
+    raw === "" || Number.isNaN(n) ? null : Math.max(0, Math.min(100000, n));
+
+  await prisma.client.updateMany({
+    where: { id: clientId, organizationId: tenant.organizationId },
+    data: { placementGoal: goal },
+  });
+  rev(clientId);
+}
+
 export async function deletePlacementAction(formData: FormData): Promise<void> {
   const tenant = await requireWriteAccess();
   const id = String(formData.get("id"));

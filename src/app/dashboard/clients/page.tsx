@@ -186,20 +186,27 @@ export default async function ClientsPage({
                           <td className="px-5 py-3">
                             {(() => {
                               const s = placeStats.get(client.id);
-                              const total = Math.max(
-                                client.placementGoal ?? 0,
-                                s?.total ?? 0,
-                              );
-                              if (total === 0)
+                              const goal = client.placementGoal ?? 0;
+                              const totalRecords = s?.total ?? 0;
+                              const denom = goal > 0 ? goal : totalRecords;
+                              if (denom === 0)
                                 return <span className="text-gray-400">—</span>;
                               const pub = s?.published ?? 0;
+                              const bonus =
+                                goal > 0 ? Math.max(0, totalRecords - goal) : 0;
                               return (
                                 <Link
                                   href={`/dashboard/clients/${client.id}?tab=placements`}
                                   className="font-medium text-blue-700 underline"
                                   title="Zur Platzierungs-Übersicht"
                                 >
-                                  {pub}/{total}
+                                  {pub}/{denom}
+                                  {bonus > 0 && (
+                                    <span className="text-purple-700">
+                                      {" "}
+                                      +{bonus}
+                                    </span>
+                                  )}
                                 </Link>
                               );
                             })()}
