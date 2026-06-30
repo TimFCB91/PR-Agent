@@ -39,7 +39,10 @@ function str(v: unknown): string {
 
 function toInt(v: unknown): number | undefined {
   const n = typeof v === "number" ? v : parseInt(str(v).replace(/[^\d-]/g, ""), 10);
-  return Number.isFinite(n) && n >= 0 ? n : undefined;
+  // Guard against junk cells (e.g. a date that slipped into the goal column):
+  // a Zusagenziel above a few thousand is nonsense and would overflow INT4.
+  if (!Number.isFinite(n) || n < 0 || n > 100000) return undefined;
+  return Math.trunc(n);
 }
 
 function toDate(v: unknown): Date | undefined {
