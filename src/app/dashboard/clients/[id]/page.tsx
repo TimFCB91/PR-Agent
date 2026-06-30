@@ -65,7 +65,7 @@ import {
   deletePublicationAction,
 } from "@/actions/publications";
 import {
-  buildKnowledgeAction,
+  rebuildKnowledgeAction,
   generateTopicsFromKnowledgeAction,
   buildBriefingViaAgentAction,
   buildArticleViaAgentAction,
@@ -91,6 +91,7 @@ import {
 } from "@/actions/placements";
 import { ReportingImportForm } from "./_forms/reporting-import-form";
 import { ArticleFileImportForm } from "./_forms/article-file-import-form";
+import { KnowledgeRebuildButton } from "./_forms/knowledge-rebuild-button";
 import { InsightForm } from "./_forms/insight-form";
 import { TopicForm } from "./_forms/topic-form";
 import { BriefingForm } from "./_forms/briefing-form";
@@ -640,19 +641,18 @@ async function KnowledgeTab({
       )}
 
       {writable && (
-        <div className="flex flex-wrap gap-2 mb-2">
-          <ActionButton
-            action={buildKnowledgeAction}
-            fields={{ clientId }}
-            label="Wissen aufbauen"
-            variant="primary"
+        <Card className="space-y-3 p-4">
+          <KnowledgeRebuildButton
+            action={rebuildKnowledgeAction.bind(null, clientId)}
           />
-          <ActionButton
-            action={generateTopicsFromKnowledgeAction}
-            fields={{ clientId }}
-            label="Themen aus Wissen generieren"
-          />
-        </div>
+          <div className="border-t border-gray-100 pt-3">
+            <ActionButton
+              action={generateTopicsFromKnowledgeAction}
+              fields={{ clientId }}
+              label="Themen aus Wissen generieren"
+            />
+          </div>
+        </Card>
       )}
 
       {writable && (

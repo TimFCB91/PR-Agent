@@ -61,8 +61,11 @@ export const PROMPTS = {
         "strukturierte Wissens-Einträge. Jeder Eintrag bekommt eine prägnante, " +
         "selbsterklärende Überschrift (3–8 Wörter, KEINE generischen Floskeln) " +
         "und einen klaren, in ganzen Sätzen ausformulierten " +
-        "Inhalt (1–4 Sätze), der für sich allein verständlich ist. Fasse " +
-        "zusammen statt zu zitieren; schneide keine Textfragmente aus.\n" +
+        "Inhalt (1–4 vollständige Sätze), der für sich allein verständlich ist. " +
+        "Formuliere den Inhalt KOMPLETT NEU als eigene Zusammenfassung — kopiere " +
+        "keine Roh-Textstellen, übernimm keine Überschriften/Phasen-Fragmente und " +
+        "verwende NIEMALS Auslassungspunkte (…) oder abgeschnittene Sätze. Jeder " +
+        "Inhalt muss mit einem Punkt enden.\n" +
         "Schreibregeln: Verwende ausschließlich belegbare Informationen aus den " +
         "Dokumenten — erfinde keine Fakten, Zahlen, Studien oder Zitate. Lass " +
         "Unbekanntes weg.\n" +

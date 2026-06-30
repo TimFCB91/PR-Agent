@@ -16,6 +16,7 @@ import { runArticleAgent } from "@/lib/ai/agents/articleAgent";
 import { runMediaMatchingAgent } from "@/lib/ai/agents/mediaMatchingAgent";
 import { runFollowUpAgent, type FollowUpAgentInput } from "@/lib/ai/agents/followUpAgent";
 import { fallbackNotice } from "@/lib/ai/agents/runAgent";
+import type { FormState } from "@/lib/form";
 import {
   buildClientEvidence,
   getRuleSetForType,
@@ -39,17 +40,24 @@ async function getClient(clientId: string, organizationId: string) {
 }
 
 /**
- * Build the central client knowledge + knowledge graph from all raw inputs.
- * Idempotent: rebuilds knowledge, nodes and edges for the client each run.
+ * Core: rebuild the central client knowledge + graph from all raw inputs via
+ * the real AI knowledge agent. Returns how many entries were created and
+ * whether the AI fell back to the deterministic placeholder.
+ *
+ * @param wipeManual when true, also delete manually created/edited entries
+ *   (a full reset); otherwise manual entries are preserved.
  */
-export async function buildKnowledgeAction(formData: FormData): Promise<void> {
-  const tenant = await requireWriteAccess();
-  const clientId = String(formData.get("clientId"));
-  const client = await getClient(clientId, tenant.organizationId);
-  if (!client) return;
+async function rebuildClientKnowledge(
+  clientId: string,
+  organizationId: string,
+  userId: string | undefined,
+  opts: { wipeManual?: boolean } = {},
+): Promise<{ created: number; usedFallback: boolean; error?: string }> {
+  const client = await getClient(clientId, organizationId);
+  if (!client) return { created: 0, usedFallback: false, error: "Kunde nicht gefunden." };
 
   const rawInputs = await prisma.clientRawInput.findMany({
-    where: { clientId, organizationId: tenant.organizationId },
+    where: { clientId, organizationId },
     select: { id: true, title: true, rawText: true, sourceType: true },
   });
 
@@ -65,18 +73,20 @@ export async function buildKnowledgeAction(formData: FormData): Promise<void> {
 
   const run = await runKnowledgeAgent(
     { clientName: client.name, notes: client.notes, documents },
-    { organizationId: tenant.organizationId, userId: tenant.userId },
+    { organizationId, userId },
   );
 
-  const knowledge = run.output.knowledge.map((k) => ({
-    category: normaliseCategory(k.category),
-    title: k.title.slice(0, 200),
-    content: k.content ?? "",
-    confidence: Math.round(k.confidence ?? 60),
-    sourceIds: (k.sources ?? [])
-      .map((s) => refToId.get(s))
-      .filter(Boolean) as string[],
-  }));
+  const knowledge = run.output.knowledge
+    .map((k) => ({
+      category: normaliseCategory(k.category),
+      title: k.title.trim().slice(0, 200),
+      content: (k.content ?? "").trim(),
+      confidence: Math.round(k.confidence ?? 60),
+      sourceIds: (k.sources ?? [])
+        .map((s) => refToId.get(s))
+        .filter(Boolean) as string[],
+    }))
+    .filter((k) => k.title.length > 0);
   const { nodes, edges } = deriveGraph(knowledge);
 
   const mediaAreas = [
@@ -88,15 +98,17 @@ export async function buildKnowledgeAction(formData: FormData): Promise<void> {
   ].slice(0, 12);
 
   await prisma.$transaction(async (tx) => {
-    const scope = { clientId, organizationId: tenant.organizationId };
+    const scope = { clientId, organizationId };
     await tx.client.updateMany({
-      where: { id: clientId, organizationId: tenant.organizationId },
+      where: { id: clientId, organizationId },
       data: { mediaAreas },
     });
     await tx.knowledgeEdge.deleteMany({ where: scope });
     await tx.knowledgeNode.deleteMany({ where: scope });
-    // Keep manually created/edited knowledge; only replace auto-built entries.
-    await tx.clientKnowledge.deleteMany({ where: { ...scope, manual: false } });
+    // Replace auto-built entries; keep manual ones unless a full reset.
+    await tx.clientKnowledge.deleteMany({
+      where: opts.wipeManual ? scope : { ...scope, manual: false },
+    });
 
     if (knowledge.length > 0) {
       await tx.clientKnowledge.createMany({
@@ -133,6 +145,68 @@ export async function buildKnowledgeAction(formData: FormData): Promise<void> {
   });
 
   revClient(clientId);
+  return {
+    created: knowledge.length,
+    usedFallback: run.usedFallback,
+    error: run.error,
+  };
+}
+
+/**
+ * Build the central client knowledge + knowledge graph from all raw inputs.
+ * Idempotent: rebuilds knowledge, nodes and edges for the client each run.
+ */
+export async function buildKnowledgeAction(formData: FormData): Promise<void> {
+  const tenant = await requireWriteAccess();
+  const clientId = String(formData.get("clientId"));
+  await rebuildClientKnowledge(clientId, tenant.organizationId, tenant.userId);
+}
+
+export interface KnowledgeBuildState extends FormState {
+  created?: number;
+  usedFallback?: boolean;
+}
+
+/**
+ * One-click "Wissen per KI neu aufbauen": wipes the AI-generated knowledge and
+ * regenerates it from the current raw inputs. Surfaces whether real AI was used
+ * or it fell back to the placeholder, so the result is never silently wrong.
+ */
+export async function rebuildKnowledgeAction(
+  clientId: string,
+  _prev: KnowledgeBuildState,
+  formData: FormData,
+): Promise<KnowledgeBuildState> {
+  const tenant = await requireWriteAccess();
+  const wipeManual = String(formData.get("wipeManual") ?? "") === "true";
+
+  let result;
+  try {
+    result = await rebuildClientKnowledge(
+      clientId,
+      tenant.organizationId,
+      tenant.userId,
+      { wipeManual },
+    );
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        "Neuaufbau fehlgeschlagen: " +
+        (e instanceof Error ? e.message : String(e)),
+    };
+  }
+
+  if (result.error && result.usedFallback) {
+    return {
+      ok: false,
+      created: result.created,
+      usedFallback: true,
+      error: fallbackNotice({ usedFallback: true, error: result.error }),
+    };
+  }
+
+  return { ok: true, created: result.created, usedFallback: false };
 }
 
 /**
