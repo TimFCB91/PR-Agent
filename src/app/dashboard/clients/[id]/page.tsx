@@ -539,47 +539,30 @@ async function KnowledgeTab({
   organizationId: string;
   writable: boolean;
 }) {
-  const [items, topics, mediaContacts] = await Promise.all([
+  const [items, client, mediaContacts] = await Promise.all([
     prisma.clientKnowledge.findMany({
       where: { clientId, organizationId },
       orderBy: { confidence: "desc" },
     }),
-    prisma.topicIdea.findMany({
-      where: { clientId, organizationId },
-      select: { title: true, description: true, mediaAngle: true },
+    prisma.client.findFirst({
+      where: { id: clientId, organizationId },
+      select: { mediaAreas: true },
     }),
     prisma.mediaContact.findMany({
       where: { organizationId, doNotContact: false },
-      select: {
-        beat: true,
-        outlet: true,
-        notes: true,
-        lastSuccessfulTopic: true,
-        preferredAngles: true,
-      },
+      select: { beat: true, outlet: true, notes: true },
     }),
   ]);
 
   const createAction = createKnowledgeAction.bind(null, clientId);
 
-  // Theme/media-area suggestions — grounded only in real records: the client's
-  // own knowledge + topics, matched against the real media database.
-  const bits = [
-    ...items.map((k) => ({
-      text: `${k.title} ${k.content ?? ""}`,
-      confidence: k.confidence,
-    })),
-    ...topics.map((t) => ({
-      text: `${t.title} ${t.description ?? ""} ${t.mediaAngle ?? ""}`,
-      confidence: 60,
-    })),
-  ];
+  // Media-area suggestions — grounded only in real records: the client's
+  // AI-derived areas (from its real documents), each annotated with how many
+  // matching media contacts exist in the database.
   const mediaTexts = mediaContacts.map((m) =>
-    [m.beat, m.outlet, m.notes, m.lastSuccessfulTopic, ...m.preferredAngles]
-      .filter(Boolean)
-      .join(" "),
+    [m.beat, m.outlet, m.notes].filter(Boolean).join(" "),
   );
-  const mediaAreas = suggestMediaAreas(bits, mediaTexts, 8);
+  const mediaAreas = suggestMediaAreas(client?.mediaAreas ?? [], mediaTexts, 12);
 
   // Compact knowledge breakdown by category.
   const byCategory = new Map<string, number>();

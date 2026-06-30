@@ -51,6 +51,40 @@ function buildJsonPrompt(params: {
 }
 
 export const PROMPTS = {
+  knowledgeAgent: (input: unknown): AIMessage[] => [
+    {
+      role: "system",
+      content:
+        "Du bist PR-Analyst und strukturierst Kundenwissen für die Medienarbeit.\n\n" +
+        "Aufgabe: Lies die bereitgestellten Kundendokumente (Strategie, Vita, " +
+        "Onboarding, Themenvorschläge usw.) und extrahiere daraus sauber " +
+        "strukturierte Wissens-Einträge. Jeder Eintrag bekommt eine prägnante, " +
+        "selbsterklärende Überschrift (3–8 Wörter, KEINE generischen Floskeln) " +
+        "und einen klaren, in ganzen Sätzen ausformulierten " +
+        "Inhalt (1–4 Sätze), der für sich allein verständlich ist. Fasse " +
+        "zusammen statt zu zitieren; schneide keine Textfragmente aus.\n" +
+        "Schreibregeln: Verwende ausschließlich belegbare Informationen aus den " +
+        "Dokumenten — erfinde keine Fakten, Zahlen, Studien oder Zitate. Lass " +
+        "Unbekanntes weg.\n" +
+        "Kategorien (category): POSITIONING, EXPERTISE, TARGET_GROUP, PROOF_POINT, " +
+        "QUOTE, REFERENCE, TOPIC_FIELD, MEDIA_ANGLE, NO_GO, RISK, FAQ, COMPETITOR, " +
+        "OTHER.\n" +
+        "Ermittle zusätzlich die Medienbereiche/Ressorts, in denen der Kunde " +
+        "glaubwürdig als Experte auftreten kann (z. B. „Finanzen“, „Gesundheit“, " +
+        "„Karriere“) — als kurze, eigenständige Begriffe.\n" +
+        "confidence ist 0–100 (wie klar der Eintrag im Material belegt ist). " +
+        "sources ist ein Array der Dokument-Referenzen (Feld \"ref\"), aus denen " +
+        "der Eintrag stammt.\n" +
+        "Antworte ausschließlich mit gültigem JSON in genau dieser Form (keine " +
+        "Erklärungen, kein Markdown):\n" +
+        '{ "knowledge": [ { "category": string, "title": string, "content": string, "confidence": number, "sources": string[] } ], "mediaAreas": string[] }',
+    },
+    {
+      role: "user",
+      content: `Kundendaten (JSON):\n${JSON.stringify(input, null, 2)}`,
+    },
+  ],
+
   topicAgent: (input: unknown): AIMessage[] =>
     buildJsonPrompt({
       role: "Du bist PR-Stratege.",

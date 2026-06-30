@@ -81,6 +81,18 @@ export function buildKnowledge(inputs: RawInputLike[]): KnowledgeBuildResult {
     }
   }
 
+  return { knowledge, ...deriveGraph(knowledge) };
+}
+
+/**
+ * Derive the knowledge graph (nodes + edges) from a set of knowledge entries —
+ * one node per entry, with topic fields connected to the expertise / proof /
+ * media-angle entries that support them. Shared by the mock builder and the
+ * real AI extraction path.
+ */
+export function deriveGraph(
+  knowledge: ProposedKnowledge[],
+): { nodes: ProposedNode[]; edges: ProposedEdge[] } {
   // Build graph nodes (one per knowledge entry) and connect topic fields to the
   // expertise / media-angle entries that support them.
   const nodes: ProposedNode[] = knowledge.map((k, i) => ({
@@ -101,5 +113,5 @@ export function buildKnowledge(inputs: RawInputLike[]): KnowledgeBuildResult {
     }
   }
 
-  return { knowledge, nodes, edges };
+  return { nodes, edges };
 }

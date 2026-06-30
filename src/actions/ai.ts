@@ -5,7 +5,11 @@ import type { Level } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireWriteAccess } from "@/lib/tenant";
-import { buildKnowledge } from "@/lib/ai/knowledge/knowledgeBuilder";
+import { deriveGraph } from "@/lib/ai/knowledge/knowledgeBuilder";
+import {
+  runKnowledgeAgent,
+  normaliseCategory,
+} from "@/lib/ai/agents/knowledgeAgent";
 import { runTopicAgent } from "@/lib/ai/agents/topicAgent";
 import { runBriefingAgent } from "@/lib/ai/agents/briefingAgent";
 import { runArticleAgent } from "@/lib/ai/agents/articleAgent";
@@ -49,12 +53,46 @@ export async function buildKnowledgeAction(formData: FormData): Promise<void> {
     select: { id: true, title: true, rawText: true, sourceType: true },
   });
 
-  const { knowledge, nodes, edges } = buildKnowledge(
-    rawInputs.map((r) => ({ ...r, sourceType: r.sourceType })),
+  // Stable refs (d0, d1, …) so the model can cite which document each entry
+  // came from; mapped back to real ids afterwards.
+  const refToId = new Map<string, string>();
+  const documents = rawInputs.map((r, i) => {
+    const ref = `d${i}`;
+    refToId.set(ref, r.id);
+    // Cap each document so several long files stay within the model context.
+    return { ref, title: r.title, text: (r.rawText ?? "").slice(0, 12000) };
+  });
+
+  const run = await runKnowledgeAgent(
+    { clientName: client.name, notes: client.notes, documents },
+    { organizationId: tenant.organizationId, userId: tenant.userId },
   );
+
+  const knowledge = run.output.knowledge.map((k) => ({
+    category: normaliseCategory(k.category),
+    title: k.title.slice(0, 200),
+    content: k.content ?? "",
+    confidence: Math.round(k.confidence ?? 60),
+    sourceIds: (k.sources ?? [])
+      .map((s) => refToId.get(s))
+      .filter(Boolean) as string[],
+  }));
+  const { nodes, edges } = deriveGraph(knowledge);
+
+  const mediaAreas = [
+    ...new Set(
+      (run.output.mediaAreas ?? [])
+        .map((a) => a.trim())
+        .filter((a) => a.length > 1 && a.length <= 40),
+    ),
+  ].slice(0, 12);
 
   await prisma.$transaction(async (tx) => {
     const scope = { clientId, organizationId: tenant.organizationId };
+    await tx.client.updateMany({
+      where: { id: clientId, organizationId: tenant.organizationId },
+      data: { mediaAreas },
+    });
     await tx.knowledgeEdge.deleteMany({ where: scope });
     await tx.knowledgeNode.deleteMany({ where: scope });
     // Keep manually created/edited knowledge; only replace auto-built entries.

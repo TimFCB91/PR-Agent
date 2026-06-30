@@ -326,6 +326,8 @@ model Client {
   placementGoal     Int? // Zusagenziel (Anzahl Platzierungen)
   tier              ContactPriority? // Kundenstufe A/B/C
   status            ClientStatus     @default(ACTIVE)
+  // AI-derived media areas/Ressorts the client is credible in (from knowledge).
+  mediaAreas        String[]         @default([])
   // Internal topic pool: a special "client" that only holds imported pool
   // topics (e.g. from Trello). Excluded from the normal client list and from
   // matching candidates.
