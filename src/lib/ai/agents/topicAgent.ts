@@ -40,7 +40,7 @@ export const topicOutputSchema = z.object({
       mediaAngle: z.string(),
       searchPotential: level,
       priority: level,
-      historicalNote: z.string(),
+      historicalNote: z.string().optional(),
     }),
   ),
   sourceReferences: z.array(sourceReferenceOutput),

@@ -110,7 +110,7 @@ export const PROMPTS = {
       task: "Bewerte, wie gut die Medienkontakte zum Thema und Kundenprofil passen.",
       input,
       outputShape:
-        '{ "matches": [ { "mediaContactId": string, "matchScore": number, "reason": string, "suggestedAngle": string } ] }',
+        '{ "matches": [ { "mediaContactId": string, "matchScore": number, "historicalSuccessScore": number, "reason": string, "suggestedAngle": string } ] }',
     }),
 
   pitchAgent: (input: unknown): AIMessage[] =>
@@ -119,7 +119,7 @@ export const PROMPTS = {
       task: "Erstelle einen Pitch an einen Medienkontakt.",
       input,
       outputShape:
-        '{ "subject": string, "pitchEmail": string, "reasoning": string }',
+        '{ "subject": string, "pitchEmail": string, "reasoning": string, "recommendedAngle": string, "successProbability": number }',
     }),
 
   followUpAgent: (input: unknown): AIMessage[] =>

@@ -39,7 +39,7 @@ export const mediaMatchOutputSchema = z.object({
     z.object({
       mediaContactId: z.string(),
       matchScore: z.number(), // 0-100 (fit)
-      historicalSuccessScore: z.number(), // 0-100 (track record)
+      historicalSuccessScore: z.number().optional(), // 0-100 (track record)
       reason: z.string(),
       suggestedAngle: z.string(),
     }),

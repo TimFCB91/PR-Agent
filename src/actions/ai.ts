@@ -605,7 +605,11 @@ export async function matchAndCreateOutreachAction(
         agreedTopic: topic.title,
         internalNotes: [
           notice,
-          `Match-Score ${match.matchScore} · Historie ${match.historicalSuccessScore}: ${match.reason}\nVorgeschlagener Winkel: ${match.suggestedAngle}`,
+          `Match-Score ${match.matchScore}${
+            match.historicalSuccessScore != null
+              ? ` · Historie ${match.historicalSuccessScore}`
+              : ""
+          }: ${match.reason}\nVorgeschlagener Winkel: ${match.suggestedAngle}`,
         ]
           .filter(Boolean)
           .join("\n"),

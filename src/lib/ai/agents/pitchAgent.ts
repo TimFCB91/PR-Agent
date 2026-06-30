@@ -32,8 +32,8 @@ export const pitchOutputSchema = z.object({
   subject: z.string(),
   pitchEmail: z.string(),
   reasoning: z.string(),
-  recommendedAngle: z.string(),
-  successProbability: z.number(), // 0-100
+  recommendedAngle: z.string().optional(),
+  successProbability: z.number().optional(), // 0-100
   sourceReferences: z.array(sourceReferenceOutput),
   missingInfo: z.array(z.string()),
 });
