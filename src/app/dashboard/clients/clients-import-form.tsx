@@ -22,9 +22,11 @@ export function ClientsImportForm() {
         Kunden aus Excel importieren (KUNDEN-Tabelle)
       </h2>
       <p className="mt-1 text-xs text-gray-500">
-        Liest das Blatt „KUNDEN": Name, Stufe (A/B/C), Paket, Zuständig,
-        Onboarding-Datum und Zusagenziel. Bereits vorhandene Kunden (gleicher
-        Name) werden übersprungen – mehrfach ausführbar ohne Dubletten.
+        Liest das Blatt „KUNDEN": Name, Stufe (A/B/C), Paket, Zuständig
+        (Spalte „zuständig"), Onboarding-Datum, Zusagenziel und Status
+        (aktiv/pausiert/storniert). Bereits vorhandene Kunden (gleicher Name)
+        werden <strong>aktualisiert</strong> – ein erneuter Upload korrigiert
+        also deine Daten, ohne Dubletten anzulegen.
       </p>
 
       <form action={formAction} className="mt-4 flex flex-wrap items-end gap-3">
@@ -50,8 +52,8 @@ export function ClientsImportForm() {
       )}
       {state.ok && (
         <p className="mt-3 rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
-          {state.imported ?? 0} Kunden importiert, {state.skipped ?? 0} bereits
-          vorhanden (übersprungen). Gesamt erkannt: {state.total ?? 0}.
+          {state.imported ?? 0} neu importiert, {state.updated ?? 0}{" "}
+          aktualisiert. Gesamt erkannt: {state.total ?? 0}.
         </p>
       )}
     </Card>

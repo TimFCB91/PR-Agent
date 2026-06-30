@@ -9,14 +9,14 @@ import { parseClientsExcel } from "@/lib/clients/clientsExcelImport";
 
 export interface ClientsImportState extends FormState {
   imported?: number;
-  skipped?: number;
+  updated?: number;
   total?: number;
 }
 
 /**
- * Import clients from the agency's "KUNDEN" Excel sheet. Existing clients
- * (matched by name, case-insensitive) are skipped so the import can be re-run
- * without creating duplicates.
+ * Import clients from the agency's "KUNDEN" Excel sheet. Matched by name
+ * (case-insensitive): existing clients are UPDATED (so a re-run corrects their
+ * data), new ones are created. Re-runnable without duplicates.
  */
 export async function importClientsExcelAction(
   _prev: ClientsImportState,
@@ -49,35 +49,46 @@ export async function importClientsExcelAction(
     return { ok: false, error: "Keine Kundenzeilen im KUNDEN-Blatt gefunden." };
   }
 
-  // Skip names that already exist (case-insensitive), incl. the topic pool.
-  let toCreate;
+  let created = 0;
+  let updated = 0;
   try {
+    // Map existing client names -> id (skip the internal topic pool).
     const existing = await prisma.client.findMany({
-      where: { organizationId: tenant.organizationId },
-      select: { name: true },
+      where: { organizationId: tenant.organizationId, isTopicPool: false },
+      select: { id: true, name: true },
     });
-    const existingNames = new Set(
-      existing.map((c) => c.name.trim().toLowerCase()),
+    const idByName = new Map(
+      existing.map((c) => [c.name.trim().toLowerCase(), c.id]),
     );
 
-    toCreate = rows.filter(
-      (r) => !existingNames.has(r.name.trim().toLowerCase()),
-    );
-
-    if (toCreate.length > 0) {
-      await prisma.client.createMany({
-        data: toCreate.map((r) => ({
+    const toCreate: Array<Record<string, unknown>> = [];
+    for (const r of rows) {
+      const id = idByName.get(r.name.trim().toLowerCase());
+      const data = {
+        tier: r.tier,
+        package: r.package,
+        responsiblePerson: r.responsiblePerson,
+        onboardingDate: r.onboardingDate,
+        placementGoal: r.placementGoal,
+        status: r.status,
+        // Only overwrite notes when the Excel actually has one.
+        ...(r.notes ? { notes: r.notes } : {}),
+      };
+      if (id) {
+        await prisma.client.update({ where: { id }, data });
+        updated++;
+      } else {
+        toCreate.push({
           organizationId: tenant.organizationId,
           name: r.name,
-          tier: r.tier,
-          package: r.package,
-          responsiblePerson: r.responsiblePerson,
-          onboardingDate: r.onboardingDate,
-          placementGoal: r.placementGoal,
-          notes: r.notes,
-          status: "ACTIVE" as const,
-        })),
-      });
+          ...data,
+        });
+      }
+    }
+
+    if (toCreate.length > 0) {
+      await prisma.client.createMany({ data: toCreate as never });
+      created = toCreate.length;
     }
   } catch (e) {
     return {
@@ -90,10 +101,5 @@ export async function importClientsExcelAction(
 
   revalidatePath("/dashboard/clients");
   revalidatePath("/dashboard/uebersicht");
-  return {
-    ok: true,
-    total: rows.length,
-    imported: toCreate.length,
-    skipped: rows.length - toCreate.length,
-  };
+  return { ok: true, total: rows.length, imported: created, updated };
 }
