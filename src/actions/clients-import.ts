@@ -71,7 +71,10 @@ export async function importClientsExcelAction(
         onboardingDate: r.onboardingDate,
         placementGoal: r.placementGoal,
         status: r.status,
-        // Only overwrite notes when the Excel actually has one.
+        // Only overwrite these when the Excel actually has a value, so we never
+        // wipe data the user entered manually.
+        ...(r.email ? { contactEmail: r.email } : {}),
+        ...(r.phone ? { contactPhone: r.phone } : {}),
         ...(r.notes ? { notes: r.notes } : {}),
       };
       if (id) {
