@@ -73,8 +73,13 @@ export async function importClientsExcelAction(
       });
       removed = del.count;
     }
+    // Build the name -> id map from the clients that still exist (exclude the
+    // junk we just deleted, so we never try to update a removed record).
+    const deleted = new Set(junkIds);
     const idByName = new Map(
-      existing.map((c) => [c.name.trim().toLowerCase(), c.id]),
+      existing
+        .filter((c) => !deleted.has(c.id))
+        .map((c) => [c.name.trim().toLowerCase(), c.id]),
     );
 
     // Clients that already have placements — never overwrite those (the user
@@ -106,9 +111,18 @@ export async function importClientsExcelAction(
 
       let clientId = idByName.get(r.name.trim().toLowerCase());
       if (clientId) {
-        await prisma.client.update({ where: { id: clientId }, data });
-        updated++;
-      } else {
+        // updateMany never throws if the record is gone; fall back to create.
+        const res = await prisma.client.updateMany({
+          where: { id: clientId, organizationId: org },
+          data,
+        });
+        if (res.count > 0) {
+          updated++;
+        } else {
+          clientId = undefined;
+        }
+      }
+      if (!clientId) {
         const c = await prisma.client.create({
           data: { organizationId: org, name: r.name, ...data },
           select: { id: true },
