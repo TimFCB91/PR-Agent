@@ -528,6 +528,8 @@ model TopicIdea {
   newsValue       Level       @default(MEDIUM)
   priority        Level       @default(MEDIUM)
   status          TopicStatus @default(DRAFT)
+  // Manually created topics are protected from the AI re-generation.
+  manual          Boolean     @default(false)
   clientId        String
   campaignId      String?
   organizationId  String

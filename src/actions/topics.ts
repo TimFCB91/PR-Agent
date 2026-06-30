@@ -51,7 +51,12 @@ export async function createTopicAction(
   }
 
   await prisma.topicIdea.create({
-    data: { ...parsed.data, clientId, organizationId: tenant.organizationId },
+    data: {
+      ...parsed.data,
+      manual: true,
+      clientId,
+      organizationId: tenant.organizationId,
+    },
   });
 
   rev(clientId);

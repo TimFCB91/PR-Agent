@@ -34,6 +34,7 @@ export const topicOutputSchema = z.object({
   topics: z.array(
     z.object({
       title: z.string(),
+      description: z.string().optional(),
       relevance: level,
       targetMediaType: z.string(),
       mediaAngle: z.string(),
@@ -63,6 +64,7 @@ const definition: AgentDefinition<TopicAgentInput, TopicAgentOutput> = {
   name: "topicAgent",
   inputSchema: topicInputSchema,
   outputSchema: topicOutputSchema,
+  maxTokens: 8000,
   buildMessages: (input) => PROMPTS.topicAgent(input),
   mock: (input) => ({
     topics: input.knowledge
@@ -88,6 +90,7 @@ const definition: AgentDefinition<TopicAgentInput, TopicAgentOutput> = {
         }
         return {
           title,
+          description: k.content ? String(k.content).slice(0, 300) : undefined,
           relevance: (high ? "HIGH" : "MEDIUM") as "HIGH" | "MEDIUM",
           targetMediaType: high ? "Online-Leitmedien" : "Fachpresse",
           mediaAngle: ANGLE[k.category] ?? "Allgemeiner Pitch",

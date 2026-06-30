@@ -58,7 +58,7 @@ import {
 } from "@/actions/publications";
 import {
   rebuildKnowledgeAction,
-  generateTopicsFromKnowledgeAction,
+  rebuildTopicsAction,
   buildBriefingViaAgentAction,
   buildArticleViaAgentAction,
   matchAndCreateOutreachAction,
@@ -84,6 +84,7 @@ import {
 import { ReportingImportForm } from "./_forms/reporting-import-form";
 import { ArticleFileImportForm } from "./_forms/article-file-import-form";
 import { KnowledgeRebuildButton } from "./_forms/knowledge-rebuild-button";
+import { TopicsRebuildButton } from "./_forms/topics-rebuild-button";
 import { TopicForm } from "./_forms/topic-form";
 import { BriefingForm } from "./_forms/briefing-form";
 import { ArticleForm } from "./_forms/article-form";
@@ -492,17 +493,10 @@ async function KnowledgeTab({
       )}
 
       {writable && (
-        <Card className="space-y-3 p-4">
+        <Card className="p-4">
           <KnowledgeRebuildButton
             action={rebuildKnowledgeAction.bind(null, clientId)}
           />
-          <div className="border-t border-gray-100 pt-3">
-            <ActionButton
-              action={generateTopicsFromKnowledgeAction}
-              fields={{ clientId }}
-              label="Themen aus Wissen generieren"
-            />
-          </div>
         </Card>
       )}
 
@@ -804,6 +798,12 @@ async function TopicsTab({
 
   return (
     <div className="space-y-4">
+      {writable && (
+        <Card className="p-4">
+          <TopicsRebuildButton action={rebuildTopicsAction.bind(null, clientId)} />
+        </Card>
+      )}
+
       {writable && (
         <details>
           <summary className="cursor-pointer text-sm font-medium text-gray-700">

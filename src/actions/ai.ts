@@ -210,44 +210,53 @@ export async function rebuildKnowledgeAction(
 }
 
 /**
- * Topic agent: derive topic ideas from the client's knowledge.
+ * Core: (re)generate topic ideas from the client's knowledge via the topic
+ * agent. Removes the previously auto-generated, still-untouched (DRAFT) topics
+ * so repeated runs don't pile up duplicates, while preserving manual topics and
+ * any topic that already progressed. Returns count + AI fallback status.
  */
-export async function generateTopicsFromKnowledgeAction(
-  formData: FormData,
-): Promise<void> {
-  const tenant = await requireWriteAccess();
-  const clientId = String(formData.get("clientId"));
-  const client = await getClient(clientId, tenant.organizationId);
-  if (!client) return;
+async function regenerateClientTopics(
+  clientId: string,
+  organizationId: string,
+  userId: string | undefined,
+): Promise<{ created: number; usedFallback: boolean; error?: string }> {
+  const client = await getClient(clientId, organizationId);
+  if (!client) return { created: 0, usedFallback: false, error: "Kunde nicht gefunden." };
 
   const knowledge = await prisma.clientKnowledge.findMany({
-    where: { clientId, organizationId: tenant.organizationId },
+    where: { clientId, organizationId },
     select: { category: true, title: true, content: true },
   });
 
   // Mandatory retrieval step.
   const gathered = await gatherKnowledge(
     clientId,
-    tenant.organizationId,
+    organizationId,
     `${client.name} Themen Positionierung Expertise`,
   );
 
-  const history = await getAllTopicOutcomes(tenant.organizationId);
+  const history = await getAllTopicOutcomes(organizationId);
   const run = await runTopicAgent(
     { clientName: client.name, knowledge, sources: gathered.chunks, history },
-    { organizationId: tenant.organizationId, userId: tenant.userId },
+    { organizationId, userId },
   );
   const result = run.output;
-  const notice = fallbackNotice(run);
+
+  // Replace the untouched auto-generated topics (keep manual + progressed ones).
+  await prisma.topicIdea.deleteMany({
+    where: { clientId, organizationId, manual: false, status: "DRAFT" },
+  });
 
   // Create topics individually so each can carry its source references.
   for (const t of result.topics) {
+    const description =
+      [t.description, t.historicalNote].filter(Boolean).join("\n\n") || undefined;
     const topic = await prisma.topicIdea.create({
       data: {
         clientId,
-        organizationId: tenant.organizationId,
+        organizationId,
         title: t.title,
-        description: notice || undefined,
+        description,
         mediaAngle: t.mediaAngle,
         targetMediaType: t.targetMediaType,
         searchPotential: t.searchPotential as Level,
@@ -257,15 +266,71 @@ export async function generateTopicsFromKnowledgeAction(
       },
       select: { id: true },
     });
-    await saveSourceRefs(
-      "TOPIC",
-      topic.id,
-      tenant.organizationId,
-      result.sourceReferences,
-    );
+    await saveSourceRefs("TOPIC", topic.id, organizationId, result.sourceReferences);
   }
 
   revClient(clientId);
+  return {
+    created: result.topics.length,
+    usedFallback: run.usedFallback,
+    error: run.error,
+  };
+}
+
+/**
+ * Topic agent: derive topic ideas from the client's knowledge.
+ */
+export async function generateTopicsFromKnowledgeAction(
+  formData: FormData,
+): Promise<void> {
+  const tenant = await requireWriteAccess();
+  const clientId = String(formData.get("clientId"));
+  await regenerateClientTopics(clientId, tenant.organizationId, tenant.userId);
+}
+
+export interface TopicsBuildState extends FormState {
+  created?: number;
+  usedFallback?: boolean;
+}
+
+/**
+ * One-click "Themen per KI neu generieren": rebuilds the topic ideas from the
+ * client's current knowledge and surfaces whether real AI was used.
+ */
+export async function rebuildTopicsAction(
+  clientId: string,
+  _prev: TopicsBuildState,
+  formData: FormData,
+): Promise<TopicsBuildState> {
+  const tenant = await requireWriteAccess();
+  void formData;
+
+  let result;
+  try {
+    result = await regenerateClientTopics(
+      clientId,
+      tenant.organizationId,
+      tenant.userId,
+    );
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        "Themen-Generierung fehlgeschlagen: " +
+        (e instanceof Error ? e.message : String(e)),
+    };
+  }
+
+  if (result.error && result.usedFallback) {
+    return {
+      ok: false,
+      created: result.created,
+      usedFallback: true,
+      error: fallbackNotice({ usedFallback: true, error: result.error }),
+    };
+  }
+
+  return { ok: true, created: result.created, usedFallback: false };
 }
 
 /**

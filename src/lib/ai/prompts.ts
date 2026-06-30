@@ -93,10 +93,15 @@ export const PROMPTS = {
   topicAgent: (input: unknown): AIMessage[] =>
     buildJsonPrompt({
       role: "Du bist PR-Stratege.",
-      task: "Leite aus dem Kundenwissen Themenideen für die Medienarbeit ab.",
+      task:
+        "Leite aus dem Kundenwissen konkrete Themenideen für die Medienarbeit " +
+        "ab. title = prägnante Themen-Überschrift. description = 1–2 ganze Sätze, " +
+        "worum es geht und warum es für Medien relevant ist (keine Floskeln, " +
+        "keine Auslassungspunkte). mediaAngle = der konkrete Aufhänger/Pitch. " +
+        "targetMediaType = passender Medientyp.",
       input,
       outputShape:
-        '{ "topics": [ { "title": string, "relevance": "LOW"|"MEDIUM"|"HIGH", "targetMediaType": string, "mediaAngle": string, "searchPotential": "LOW"|"MEDIUM"|"HIGH", "priority": "LOW"|"MEDIUM"|"HIGH" } ] }',
+        '{ "topics": [ { "title": string, "description": string, "relevance": "LOW"|"MEDIUM"|"HIGH", "targetMediaType": string, "mediaAngle": string, "searchPotential": "LOW"|"MEDIUM"|"HIGH", "priority": "LOW"|"MEDIUM"|"HIGH" } ] }',
     }),
 
   mediaMatchingAgent: (input: unknown): AIMessage[] =>
