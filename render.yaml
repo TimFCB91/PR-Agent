@@ -18,6 +18,9 @@ services:
     plan: starter # paid, does not sleep; use "free" to try (sleeps after idle)
     dockerfilePath: ./Dockerfile
     healthCheckPath: /login
+    # Deploy the working branch (where the full app lives). autoDeploy:true means
+    # every push here goes live automatically — handy while iterating.
+    branch: claude/pr-agent-saas-foundation-64ch1g
     autoDeploy: true
     envVars:
       - key: DATABASE_URL
