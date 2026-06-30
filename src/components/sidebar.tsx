@@ -5,10 +5,13 @@ import { usePathname } from "next/navigation";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard/uebersicht", label: "Übersicht" },
   { href: "/dashboard/clients", label: "Kunden" },
+  { href: "/dashboard/themenpool", label: "Themenpool" },
   { href: "/dashboard/campaigns", label: "Kampagnen" },
   { href: "/dashboard/media-contacts", label: "Medienkontakte" },
   { href: "/dashboard/outreach", label: "Outreach" },
+  { href: "/dashboard/follow-ups", label: "Follow-ups" },
   { href: "/dashboard/settings", label: "Einstellungen" },
 ];
 

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
-import { Card, PageHeader, Badge } from "@/components/ui";
+import { Card, PageHeader, Badge, LinkButton } from "@/components/ui";
 
 export default async function SettingsPage() {
   const { organizationId } = await requireTenant();
@@ -34,6 +34,11 @@ export default async function SettingsPage() {
             <dd className="font-medium text-gray-900">{organization?.slug}</dd>
           </div>
         </dl>
+        <div className="mt-4">
+          <LinkButton href="/dashboard/settings/profile">
+            Profil & Organisation bearbeiten
+          </LinkButton>
+        </div>
       </Card>
 
       <Card className="overflow-hidden">
@@ -64,6 +69,28 @@ export default async function SettingsPage() {
             ))}
           </tbody>
         </table>
+      </Card>
+
+      <Card className="mt-6 p-6">
+        <h2 className="text-sm font-semibold text-gray-900">Schreibregeln</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Regelwerke für die spätere Artikel-Erstellung
+        </p>
+        <div className="mt-4">
+          <LinkButton href="/dashboard/settings/writing-rules">
+            Schreibregeln verwalten
+          </LinkButton>
+        </div>
+      </Card>
+
+      <Card className="mt-6 p-6">
+        <h2 className="text-sm font-semibold text-gray-900">AI</h2>
+        <p className="mt-1 text-sm text-gray-500">KI-Modus und Nutzungs-Log</p>
+        <div className="mt-4">
+          <LinkButton href="/dashboard/settings/ai">
+            AI-Status & Nutzung
+          </LinkButton>
+        </div>
       </Card>
     </div>
   );

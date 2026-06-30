@@ -9,11 +9,14 @@ export function DeleteButton({
   action,
   label = "Löschen",
   confirmText = "Wirklich löschen?",
+  extraFields,
 }: {
   id: string;
   action: (formData: FormData) => Promise<void>;
   label?: string;
   confirmText?: string;
+  // Additional hidden inputs to submit alongside the id (e.g. clientId).
+  extraFields?: Record<string, string>;
 }) {
   return (
     <form
@@ -25,6 +28,10 @@ export function DeleteButton({
       }}
     >
       <input type="hidden" name="id" value={id} />
+      {extraFields &&
+        Object.entries(extraFields).map(([name, value]) => (
+          <input key={name} type="hidden" name={name} value={value} />
+        ))}
       <Button type="submit" variant="danger" className="px-3 py-1 text-xs">
         {label}
       </Button>

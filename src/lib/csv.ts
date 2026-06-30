@@ -54,6 +54,24 @@ export function parseCsv(input: string): string[][] {
   return rows.filter((r) => r.some((c) => c.trim() !== ""));
 }
 
+// Quote a single CSV cell if it contains special characters.
+function escapeCell(value: unknown): string {
+  const s = value === null || value === undefined ? "" : String(value);
+  if (/[",\n\r]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+/**
+ * Serialises rows (first row = header) into a CSV string. A leading BOM is
+ * added so Excel opens UTF-8 correctly.
+ */
+export function toCsv(rows: Array<Array<unknown>>): string {
+  const body = rows.map((row) => row.map(escapeCell).join(",")).join("\r\n");
+  return "﻿" + body;
+}
+
 /**
  * Parses a CSV with a header row into a list of objects keyed by lowercased
  * header names.

@@ -11,7 +11,7 @@ export default async function NewCampaignPage() {
   if (!canWrite(role)) redirect("/dashboard/campaigns");
 
   const clients = await prisma.client.findMany({
-    where: { organizationId },
+    where: { organizationId, isTopicPool: false },
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });

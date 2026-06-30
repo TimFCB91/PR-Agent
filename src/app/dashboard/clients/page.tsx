@@ -5,13 +5,14 @@ import { requireTenant, canWrite } from "@/lib/tenant";
 import { deleteClientAction } from "@/actions/clients";
 import { DeleteButton } from "@/components/delete-button";
 import { Card, PageHeader, LinkButton, EmptyState } from "@/components/ui";
+import { ClientsImportForm } from "./clients-import-form";
 
 export default async function ClientsPage() {
   const { organizationId, role } = await requireTenant();
   const writable = canWrite(role);
 
   const clients = await prisma.client.findMany({
-    where: { organizationId },
+    where: { organizationId, isTopicPool: false },
     orderBy: { createdAt: "desc" },
     include: { _count: { select: { campaigns: true } } },
   });
@@ -27,6 +28,12 @@ export default async function ClientsPage() {
           )
         }
       />
+
+      {writable && (
+        <div className="mb-6">
+          <ClientsImportForm />
+        </div>
+      )}
 
       {clients.length === 0 ? (
         <EmptyState message="Noch keine Kunden angelegt." />
@@ -45,7 +52,12 @@ export default async function ClientsPage() {
               {clients.map((client) => (
                 <tr key={client.id} className="hover:bg-gray-50">
                   <td className="px-5 py-3 font-medium text-gray-900">
-                    {client.name}
+                    <Link
+                      href={`/dashboard/clients/${client.id}`}
+                      className="hover:underline"
+                    >
+                      {client.name}
+                    </Link>
                   </td>
                   <td className="px-5 py-3 text-gray-600">
                     {client.contactEmail ?? "—"}

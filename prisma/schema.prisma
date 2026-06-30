@@ -28,11 +28,220 @@ enum CampaignStatus {
   COMPLETED
 }
 
-enum OutreachStatus {
-  PLANNED
-  SENT
-  REPLIED
+// Generic low/medium/high rating reused across the PR workflow.
+enum Level {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// Extended outreach lifecycle covering the full pitch-to-publish process.
+enum ResponseType {
+  NO_RESPONSE
+  INTERESTED
+  ACCEPTED
   DECLINED
+  NEEDS_MORE_INFO
+  OUT_OF_OFFICE
+  WRONG_CONTACT
+}
+
+enum InteractionType {
+  PITCH
+  FOLLOW_UP
+  RESPONSE
+  PUBLICATION
+}
+
+enum InteractionResult {
+  NO_RESPONSE
+  INTERESTED
+  ACCEPTED
+  DECLINED
+  PUBLISHED
+}
+
+enum MediaSourceType {
+  MANUAL
+  CSV
+  EXCEL
+  ZIMPEL
+  INTERNET_RESEARCH
+  API
+  OTHER
+}
+
+enum ImportStatus {
+  UPLOADED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  SOURCE_VERIFIED
+  MANUALLY_VERIFIED
+  OUTDATED
+}
+
+enum ResearchStatus {
+  SUGGESTED
+  REVIEWED
+  IMPORTED
+  REJECTED
+  DUPLICATE
+}
+
+enum OutreachStatus {
+  DRAFT
+  READY
+  SENT
+  FOLLOW_UP_DUE
+  INTERESTED
+  ACCEPTED
+  DECLINED
+  ARTICLE_DELIVERED
+  PUBLISHED
+}
+
+// A/B/C priority for media contacts (drives follow-up cadence and draft style).
+enum ContactPriority {
+  A
+  B
+  C
+}
+
+// Relationship classification of a media contact (Goldkunde / Blacklist).
+enum ContactRelationship {
+  NORMAL
+  GOLD
+  BLACKLIST
+}
+
+// Channel an outreach was sent through.
+enum OutreachChannel {
+  ZIMPEL
+  GMAIL
+  OUTLOOK
+  PHONE
+  OTHER
+}
+
+// Engagement status of a client account.
+enum ClientStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+// "Who is currently on the ball" for an outreach. NONE = derive from status.
+enum OutreachWaitingOn {
+  NONE
+  AGENCY
+  CLIENT
+  MEDIA
+}
+
+enum RawInputSourceType {
+  NOTE
+  WEBSITE
+  TRANSCRIPT
+  EMAIL
+  BRIEFING
+  SOCIAL
+  PRESSKIT
+  OTHER
+}
+
+enum RawInputStatus {
+  NEW
+  PROCESSED
+  NEEDS_REVIEW
+  ARCHIVED
+}
+
+enum InsightType {
+  POSITIONING
+  EXPERTISE
+  TARGET_GROUP
+  PROOF_POINT
+  QUOTE
+  TOPIC_FIELD
+  NO_GO
+  RISK
+  MISSING_INFO
+  MEDIA_ANGLE
+}
+
+enum InsightStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+}
+
+enum TopicStatus {
+  DRAFT
+  APPROVED
+  PITCHED
+  ARCHIVED
+}
+
+enum BriefingStatus {
+  DRAFT
+  APPROVED
+  DELIVERED
+}
+
+enum ArticleStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  SENT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum KnowledgeCategory {
+  POSITIONING
+  EXPERTISE
+  TARGET_GROUP
+  PROOF_POINT
+  QUOTE
+  REFERENCE
+  TOPIC_FIELD
+  MEDIA_ANGLE
+  NO_GO
+  RISK
+  FAQ
+  COMPETITOR
+  OTHER
+}
+
+enum TextType {
+  PITCH
+  FOLLOW_UP
+  BRIEFING
+  ARTICLE
+  PRESS_RELEASE
+  LINKEDIN
+  OTHER
+}
+
+enum TextEntityType {
+  PITCH
+  FOLLOW_UP
+  BRIEFING
+  ARTICLE
+}
+
+enum TextQualityStatus {
+  GENERATED
+  CHECKED
+  NEEDS_REVIEW
+  REVISED
+  APPROVED
+  REJECTED
 }
 
 // ----------------------------------------------------------------------------
@@ -46,11 +255,31 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users         User[]
-  clients       Client[]
-  campaigns     Campaign[]
-  mediaContacts MediaContact[]
-  outreaches    Outreach[]
+  users                 User[]
+  clients               Client[]
+  campaigns             Campaign[]
+  mediaContacts         MediaContact[]
+  outreaches            Outreach[]
+  rawInputs             ClientRawInput[]
+  insights              ClientInsight[]
+  topicIdeas            TopicIdea[]
+  briefings             Briefing[]
+  articleDrafts         ArticleDraft[]
+  publications          Publication[]
+  writingRuleSets       WritingRuleSet[]
+  knowledge             ClientKnowledge[]
+  knowledgeNodes        KnowledgeNode[]
+  knowledgeEdges        KnowledgeEdge[]
+  aiUsageLogs           AIUsageLog[]
+  textQualityReports    TextQualityReport[]
+  knowledgeDocuments    KnowledgeDocument[]
+  knowledgeChunks       KnowledgeChunk[]
+  knowledgeSourceRefs   KnowledgeSourceRef[]
+  mediaPerformances     MediaPerformance[]
+  mediaInteractions     MediaInteraction[]
+  journalistPreferences JournalistPreference[]
+  mediaImportSessions   MediaImportSession[]
+  mediaResearchResults  MediaResearchResult[]
 }
 
 model User {
@@ -63,28 +292,52 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rawInputs    ClientRawInput[]
+  aiUsageLogs  AIUsageLog[]
 
   @@index([organizationId])
 }
 
 // ----------------------------------------------------------------------------
-// Domain models — all scoped by organizationId
+// Core domain models — all scoped by organizationId
 // ----------------------------------------------------------------------------
 
 model Client {
-  id             String   @id @default(cuid())
-  name           String
-  contactEmail   String?
-  contactPhone   String?
-  website        String?
-  notes          String?
-  organizationId String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                String           @id @default(cuid())
+  name              String
+  contactEmail      String?
+  contactPhone      String?
+  website           String?
+  notes             String?
+  // Account management (the agency's master client overview).
+  package           String? // gebuchtes Paket / Leistung
+  responsiblePerson String? // zuständige Person
+  onboardingDate    DateTime? // Start / Onboarding
+  placementGoal     Int? // Zusagenziel (Anzahl Platzierungen)
+  tier              ContactPriority? // Kundenstufe A/B/C
+  status            ClientStatus     @default(ACTIVE)
+  // Internal topic pool: a special "client" that only holds imported pool
+  // topics (e.g. from Trello). Excluded from the normal client list and from
+  // matching candidates.
+  isTopicPool       Boolean          @default(false)
+  organizationId    String
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  campaigns    Campaign[]
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaigns          Campaign[]
+  rawInputs          ClientRawInput[]
+  insights           ClientInsight[]
+  topicIdeas         TopicIdea[]
+  briefings          Briefing[]
+  articleDrafts      ArticleDraft[]
+  publications       Publication[]
+  knowledge          ClientKnowledge[]
+  knowledgeNodes     KnowledgeNode[]
+  knowledgeEdges     KnowledgeEdge[]
+  knowledgeDocuments KnowledgeDocument[]
+  knowledgeChunks    KnowledgeChunk[]
 
   @@index([organizationId])
 }
@@ -98,53 +351,609 @@ model Campaign {
   endDate        DateTime?
   clientId       String
   organizationId String
+  // External read-only report sharing.
+  shareToken     String?        @unique
+  shareEnabled   Boolean        @default(false)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  outreaches   Outreach[]
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client             Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  outreaches         Outreach[]
+  topicIdeas         TopicIdea[]
+  briefings          Briefing[]
+  articleDrafts      ArticleDraft[]
+  publications       Publication[]
+  knowledgeDocuments KnowledgeDocument[]
 
   @@index([organizationId])
   @@index([clientId])
 }
 
 model MediaContact {
-  id             String   @id @default(cuid())
-  firstName      String
-  lastName       String
-  email          String
-  phone          String?
-  outlet         String?
-  beat           String?
-  notes          String?
-  organizationId String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                    String              @id @default(cuid())
+  firstName             String
+  lastName              String
+  email                 String?
+  phone                 String?
+  outlet                String?
+  beat                  String?
+  notes                 String?
+  // Operative steering — priority, relationship and contact protection.
+  priority              ContactPriority     @default(B)
+  relationship          ContactRelationship @default(NORMAL)
+  doNotContact          Boolean             @default(false)
+  // Media intelligence — learned from real outreach/publication history.
+  replyRate             Float?
+  acceptanceRate        Float?
+  publicationRate       Float?
+  averageResponseTime   Float? // hours
+  lastSuccessfulTopic   String?
+  preferredAngles       String[]            @default([])
+  avoidedTopics         String[]            @default([])
+  notesFromInteractions String?
+  // Provenance — how the contact entered the system.
+  sourceType            MediaSourceType     @default(MANUAL)
+  sourceImportId        String?
+  sourceUrls            String[]            @default([])
+  importedAt            DateTime?
+  verifiedAt            DateTime?
+  verificationStatus    VerificationStatus  @default(UNVERIFIED)
+  organizationId        String
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   outreaches   Outreach[]
+  briefings    Briefing[]
+  publications Publication[]
+  performance  MediaPerformance?
+  interactions MediaInteraction[]
+  preference   JournalistPreference?
 
   @@index([organizationId])
 }
 
 model Outreach {
-  id             String         @id @default(cuid())
-  subject        String
-  message        String?
-  status         OutreachStatus @default(PLANNED)
-  sentAt         DateTime?
-  campaignId     String
-  mediaContactId String
-  organizationId String
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id                 String           @id @default(cuid())
+  subject            String
+  message            String?
+  status             OutreachStatus   @default(DRAFT)
+  sentAt             DateTime?
+  // Extended PR-process fields.
+  pitchEmail         String?
+  followUpEmail      String?
+  lastContactDate    DateTime?
+  nextFollowUpDate   DateTime?
+  agreedTopic        String?
+  publicationUrl     String?
+  internalNotes      String?
+  // Operative steering — how it was sent and the explicit next step.
+  channel            OutreachChannel?
+  nextStep           String?
+  waitingOn          OutreachWaitingOn @default(NONE)
+  threadUrl          String? // direkter Link zum E-Mail-Verlauf (Gmail/Outlook)
+  // Media intelligence — captured response signals.
+  responseReceivedAt DateTime?
+  responseType       ResponseType?
+  responseSummary    String?
+  rejectionReason    String?
+  acceptedAngle      String?
+  followUpCount      Int              @default(0)
+  publicationCreated Boolean          @default(false)
+  campaignId         String
+  mediaContactId     String
+  organizationId     String
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  mediaContact MediaContact @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
+  organization        Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign            Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  mediaContact        MediaContact       @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
+  sourcedPublications Publication[]      @relation("PublicationSource")
+  interactions        MediaInteraction[]
 
   @@index([organizationId])
   @@index([campaignId])
   @@index([mediaContactId])
+}
+
+// ----------------------------------------------------------------------------
+// PR workflow models
+// ----------------------------------------------------------------------------
+
+// 1. Client intake — any unstructured information about a client.
+model ClientRawInput {
+  id             String             @id @default(cuid())
+  title          String
+  sourceType     RawInputSourceType @default(NOTE)
+  rawText        String?
+  fileName       String?
+  status         RawInputStatus     @default(NEW)
+  clientId       String
+  createdById    String?
+  organizationId String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client             Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy          User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  knowledgeDocuments KnowledgeDocument[]
+
+  @@index([organizationId])
+  @@index([clientId])
+}
+
+// 2. Structured insights derived from raw input.
+model ClientInsight {
+  id             String        @id @default(cuid())
+  insightType    InsightType
+  title          String
+  content        String?
+  confidence     Int           @default(50) // 0-100
+  status         InsightStatus @default(DRAFT)
+  clientId       String
+  organizationId String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([clientId])
+}
+
+// 3. Topic ideas / story angles.
+model TopicIdea {
+  id              String      @id @default(cuid())
+  title           String
+  description     String?
+  mediaAngle      String?
+  targetMediaType String?
+  searchPotential Level       @default(MEDIUM)
+  newsValue       Level       @default(MEDIUM)
+  priority        Level       @default(MEDIUM)
+  status          TopicStatus @default(DRAFT)
+  clientId        String
+  campaignId      String?
+  organizationId  String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign     Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  briefings    Briefing[]
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([campaignId])
+}
+
+// 4. Briefings for a pitch / article.
+model Briefing {
+  id                 String         @id @default(cuid())
+  title              String
+  targetAudience     String?
+  angle              String?
+  keyMessages        String?
+  suggestedStructure String?
+  expertContext      String?
+  noGos              String?
+  status             BriefingStatus @default(DRAFT)
+  clientId           String
+  campaignId         String?
+  topicIdeaId        String?
+  mediaContactId     String?
+  organizationId     String
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign      Campaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  topicIdea     TopicIdea?     @relation(fields: [topicIdeaId], references: [id], onDelete: SetNull)
+  mediaContact  MediaContact?  @relation(fields: [mediaContactId], references: [id], onDelete: SetNull)
+  articleDrafts ArticleDraft[]
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([campaignId])
+}
+
+// 5. Article drafts.
+model ArticleDraft {
+  id              String        @id @default(cuid())
+  title           String
+  subtitle        String?
+  articleText     String?
+  metaDescription String?
+  targetMedium    String?
+  targetAudience  String?
+  status          ArticleStatus @default(DRAFT)
+  qualityNotes    String?
+  clientId        String
+  campaignId      String?
+  briefingId      String?
+  organizationId  String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign     Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  briefing     Briefing?    @relation(fields: [briefingId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([campaignId])
+}
+
+// 6. Publications (placed coverage).
+model Publication {
+  id               String    @id @default(cuid())
+  title            String
+  url              String?
+  publicationDate  DateTime?
+  notes            String?
+  // Media intelligence — what worked and where it came from.
+  resultingTopic   String?
+  resultingAngle   String?
+  sourceOutreachId String?
+  performanceNotes String?
+  clientId         String
+  campaignId       String?
+  mediaContactId   String?
+  organizationId   String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client         Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign       Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  mediaContact   MediaContact? @relation(fields: [mediaContactId], references: [id], onDelete: SetNull)
+  sourceOutreach Outreach?     @relation("PublicationSource", fields: [sourceOutreachId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([campaignId])
+}
+
+// 10. Writing rule sets used to constrain article generation later.
+model WritingRuleSet {
+  id                       String   @id @default(cuid())
+  name                     String
+  description              String?
+  rules                    String?
+  forbiddenPhrases         String[] @default([])
+  requiredElements         String[] @default([])
+  preferredStructure       String?
+  toneOfVoice              String?
+  textType                 TextType @default(OTHER)
+  targetMediumType         String?
+  minWords                 Int?
+  maxWords                 Int?
+  allowGendering           Boolean  @default(true)
+  allowAnglicisms          Boolean  @default(false)
+  allowFirstPerson         Boolean  @default(true)
+  allowDirectClientMention Boolean  @default(true)
+  organizationId           String
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// Quality report for a generated text (pitch / follow-up / briefing / article).
+// One latest report per (entityType, entityId), upserted after each check.
+model TextQualityReport {
+  id             String            @id @default(cuid())
+  entityType     TextEntityType
+  entityId       String
+  status         TextQualityStatus @default(GENERATED)
+  score          Int               @default(0)
+  canApprove     Boolean           @default(false)
+  report         Json
+  organizationId String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([entityType, entityId])
+  @@index([organizationId])
+}
+
+// ----------------------------------------------------------------------------
+// Knowledge layer & graph (KI-gestützt)
+// ----------------------------------------------------------------------------
+
+// Central, consolidated knowledge about a client — built (later via AI) by
+// merging information across multiple raw inputs. `sourceIds` references the
+// ClientRawInput records the entry was derived from.
+model ClientKnowledge {
+  id             String            @id @default(cuid())
+  category       KnowledgeCategory
+  title          String
+  content        String?
+  confidence     Int               @default(50) // 0-100
+  // Manually created/edited entries are protected from the auto-rebuild.
+  manual         Boolean           @default(false)
+  sourceIds      String[]          @default([])
+  clientId       String
+  organizationId String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([clientId])
+}
+
+// Knowledge graph (prepared): nodes (concepts) and edges (relations) so the
+// system can later merge information into connected insights.
+model KnowledgeNode {
+  id             String   @id @default(cuid())
+  type           String // e.g. "topicField", "expertise", "mediaAngle"
+  label          String
+  description    String?
+  clientId       String
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  outgoing     KnowledgeEdge[] @relation("EdgeFrom")
+  incoming     KnowledgeEdge[] @relation("EdgeTo")
+
+  @@index([organizationId])
+  @@index([clientId])
+}
+
+model KnowledgeEdge {
+  id             String   @id @default(cuid())
+  relation       String // e.g. "supports", "relatesTo", "derivedFrom"
+  fromNodeId     String
+  toNodeId       String
+  clientId       String
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  fromNode     KnowledgeNode @relation("EdgeFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNode       KnowledgeNode @relation("EdgeTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([clientId])
+}
+
+// ----------------------------------------------------------------------------
+// AI usage logging
+// ----------------------------------------------------------------------------
+
+model AIUsageLog {
+  id             String   @id @default(cuid())
+  agent          String // agent name, e.g. "topicAgent"
+  provider       String // "mock" | "anthropic" | "openai" | "local"
+  mode           String // "mock" | "real"
+  model          String?
+  inputTokens    Int?
+  outputTokens   Int?
+  latencyMs      Int?
+  success        Boolean  @default(true)
+  error          String?
+  userId         String?
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([createdAt])
+}
+
+// ----------------------------------------------------------------------------
+// Knowledge retrieval (extends the client intake — NOT a separate store)
+// ----------------------------------------------------------------------------
+
+enum KnowledgeDocStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+// A durable, searchable document built from a ClientRawInput (or pasted text).
+// The original ClientRawInput is preserved; this is the retrieval-ready form.
+model KnowledgeDocument {
+  id             String             @id @default(cuid())
+  title          String
+  sourceType     RawInputSourceType @default(NOTE)
+  sourceName     String?
+  content        String
+  status         KnowledgeDocStatus @default(ACTIVE)
+  clientId       String
+  campaignId     String?
+  rawInputId     String?
+  organizationId String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign     Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  rawInput     ClientRawInput?  @relation(fields: [rawInputId], references: [id], onDelete: SetNull)
+  chunks       KnowledgeChunk[]
+
+  @@index([organizationId])
+  @@index([clientId])
+}
+
+// A retrievable slice of a KnowledgeDocument. `embedding` is prepared for
+// semantic search (pgvector / OpenAI / Voyage / local); empty until enabled.
+model KnowledgeChunk {
+  id             String   @id @default(cuid())
+  chunkIndex     Int
+  content        String
+  embedding      Float[]  @default([])
+  metadata       Json?
+  documentId     String
+  clientId       String
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  document     KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  client       Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([documentId])
+}
+
+// Source references actually used by an agent for a produced entity (topic,
+// pitch, briefing, article, follow-up, media match) — makes outputs traceable.
+model KnowledgeSourceRef {
+  id             String   @id @default(cuid())
+  entityType     String // TOPIC | PITCH | FOLLOW_UP | BRIEFING | ARTICLE | MEDIA_MATCH
+  entityId       String
+  documentId     String?
+  chunkId        String?
+  sourceType     String?
+  shortExcerpt   String?
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([entityType, entityId])
+}
+
+// ----------------------------------------------------------------------------
+// Media intelligence (extends MediaContact/Outreach/Campaign/Publication —
+// NOT a separate platform). Learns from real interactions.
+// ----------------------------------------------------------------------------
+
+// Aggregated, cached performance per media contact (recomputed from history).
+model MediaPerformance {
+  id                       String   @id @default(cuid())
+  totalPitches             Int      @default(0)
+  totalReplies             Int      @default(0)
+  totalAcceptances         Int      @default(0)
+  totalPublications        Int      @default(0)
+  replyRate                Float    @default(0)
+  acceptanceRate           Float    @default(0)
+  publicationRate          Float    @default(0)
+  averageResponseTimeHours Float?
+  mediaContactId           String   @unique
+  organizationId           String
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mediaContact MediaContact @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// A single logged interaction with a media contact (the learning signal).
+model MediaInteraction {
+  id              String             @id @default(cuid())
+  interactionType InteractionType
+  topicTitle      String?
+  mediaAngle      String?
+  result          InteractionResult?
+  notes           String?
+  mediaContactId  String
+  outreachId      String?
+  organizationId  String
+  createdAt       DateTime           @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mediaContact MediaContact @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
+  outreach     Outreach?    @relation(fields: [outreachId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([mediaContactId])
+}
+
+// Derived journalist preferences (built automatically from interactions).
+model JournalistPreference {
+  id               String   @id @default(cuid())
+  preferredTopics  String[] @default([])
+  preferredAngles  String[] @default([])
+  avoidedTopics    String[] @default([])
+  preferredFormats String[] @default([])
+  notes            String?
+  confidence       Int      @default(0) // 0-100
+  mediaContactId   String   @unique
+  organizationId   String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mediaContact MediaContact @relation(fields: [mediaContactId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// ----------------------------------------------------------------------------
+// Media data import & internet research (feeds the SAME MediaContact model)
+// ----------------------------------------------------------------------------
+
+// One import run (CSV / Excel / Zimpel / research). Contacts reference it.
+model MediaImportSession {
+  id               String          @id @default(cuid())
+  sourceType       MediaSourceType
+  importedByUserId String?
+  fileName         String?
+  importedRecords  Int             @default(0)
+  validRecords     Int             @default(0)
+  invalidRecords   Int             @default(0)
+  status           ImportStatus    @default(UPLOADED)
+  notes            String?
+  organizationId   String
+  createdAt        DateTime        @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// A researched media suggestion. NEVER auto-imported — needs manual approval.
+model MediaResearchResult {
+  id              String         @id @default(cuid())
+  mediumName      String
+  website         String?
+  mediaType       String?
+  section         String?
+  region          String?
+  contactName     String?
+  contactRole     String?
+  email           String?
+  contactPageUrl  String?
+  sourceUrls      String[]       @default([])
+  relevanceReason String?
+  suggestedAngle  String?
+  confidence      Int            @default(0)
+  status          ResearchStatus @default(SUGGESTED)
+  clientId        String
+  campaignId      String?
+  topicIdeaId     String?
+  organizationId  String
+  createdAt       DateTime       @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([campaignId])
 }

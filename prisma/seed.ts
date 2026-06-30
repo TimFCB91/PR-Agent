@@ -1,6 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
+import { chunkText } from "../src/lib/knowledge/chunker";
+import { recomputeAllContacts } from "../src/lib/media/mediaIntelligence";
+
 const prisma = new PrismaClient();
 
 const DEMO_PASSWORD = "password123";
@@ -27,7 +30,7 @@ async function main() {
       users: {
         create: [
           {
-            name: "Alex Owner",
+            name: "Tim Schoster",
             email: "owner@acme.test",
             passwordHash,
             role: "OWNER",
@@ -55,6 +58,10 @@ async function main() {
     },
   });
 
+  const acmeOwner = await prisma.user.findFirstOrThrow({
+    where: { organizationId: acme.id, role: "OWNER" },
+  });
+
   const acmeClientA = await prisma.client.create({
     data: {
       organizationId: acme.id,
@@ -63,6 +70,12 @@ async function main() {
       contactPhone: "+49 30 0000001",
       website: "https://nordwind.test",
       notes: "Fiktiver Kunde – E-Mobilität.",
+      package: "Online Medien Boost",
+      responsiblePerson: "Petra",
+      onboardingDate: new Date("2026-02-01"),
+      placementGoal: 10,
+      tier: "A",
+      status: "ACTIVE",
     },
   });
 
@@ -73,6 +86,12 @@ async function main() {
       contactEmail: "media@helios.test",
       website: "https://helios.test",
       notes: "Fiktiver Kunde – Lebensmittel-Startup.",
+      package: "2 Monate Agentur",
+      responsiblePerson: "Matthius",
+      onboardingDate: new Date("2026-03-15"),
+      placementGoal: 6,
+      tier: "B",
+      status: "ACTIVE",
     },
   });
 
@@ -85,6 +104,8 @@ async function main() {
       status: "ACTIVE",
       startDate: new Date("2026-03-01"),
       endDate: new Date("2026-06-30"),
+      shareToken: "demo-report-token",
+      shareEnabled: true,
     },
   });
 
@@ -106,6 +127,8 @@ async function main() {
         email: "lena.musterfrau@beispiel-magazin.test",
         outlet: "Beispiel Magazin",
         beat: "Mobilität",
+        priority: "A" as const,
+        relationship: "GOLD" as const,
       },
       {
         firstName: "Tom",
@@ -113,6 +136,7 @@ async function main() {
         email: "tom.beispiel@demo-zeitung.test",
         outlet: "Demo Zeitung",
         beat: "Wirtschaft",
+        priority: "A" as const,
       },
       {
         firstName: "Sara",
@@ -120,6 +144,7 @@ async function main() {
         email: "sara.platzhalter@test-blog.test",
         outlet: "Test Blog",
         beat: "Technologie",
+        priority: "C" as const,
       },
     ].map((c) =>
       prisma.mediaContact.create({
@@ -135,8 +160,13 @@ async function main() {
       mediaContactId: acmeContacts[0].id,
       subject: "Exklusiv: Neues City-E-Bike",
       message: "Hallo Lena, gerne bieten wir Ihnen einen Vorab-Test an.",
-      status: "SENT",
+      status: "INTERESTED",
       sentAt: new Date("2026-03-05"),
+      lastContactDate: new Date("2026-03-12"),
+      agreedTopic: "Vorab-Test City-E-Bike",
+      responseReceivedAt: new Date("2026-03-07"),
+      responseType: "INTERESTED",
+      acceptedAngle: "Produkttest",
     },
   });
 
@@ -146,7 +176,402 @@ async function main() {
       campaignId: acmeCampaign.id,
       mediaContactId: acmeContacts[1].id,
       subject: "Interviewangebot Geschäftsführung",
-      status: "PLANNED",
+      status: "FOLLOW_UP_DUE",
+      sentAt: new Date("2026-03-08"),
+      nextFollowUpDate: new Date("2026-03-20"),
+      responseType: "NO_RESPONSE",
+      followUpCount: 1,
+    },
+  });
+
+  const acmePubOutreach = await prisma.outreach.create({
+    data: {
+      organizationId: acme.id,
+      campaignId: acmeCampaign.id,
+      mediaContactId: acmeContacts[2].id,
+      subject: "Gastbeitrag zu E-Mobilität",
+      status: "PUBLISHED",
+      sentAt: new Date("2026-02-20"),
+      responseReceivedAt: new Date("2026-02-22"),
+      responseType: "ACCEPTED",
+      acceptedAngle: "Servicenutzen",
+      agreedTopic: "E-Mobilität im Alltag",
+      publicationCreated: true,
+      publicationUrl: "https://test-blog.test/e-mobilitaet",
+    },
+  });
+
+  // ---- PR workflow demo data for Acme ----
+  const acmeRaw = await prisma.clientRawInput.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      createdById: acmeOwner.id,
+      title: "Website-Text Über uns",
+      sourceType: "WEBSITE",
+      status: "PROCESSED",
+      rawText:
+        "Nordwind Mobility ist Marktführer für nachhaltige City-E-Bikes. Unser Team hat über 15 Jahre Erfahrung. Wachstum von 40 Prozent im letzten Jahr.",
+    },
+  });
+
+  await prisma.clientRawInput.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      createdById: acmeOwner.id,
+      title: "Gesprächsnotiz Geschäftsführung",
+      sourceType: "NOTE",
+      status: "NEW",
+      rawText: "Kurze Notiz.",
+    },
+  });
+
+  // ---- Knowledge document + chunks (retrieval) from the website raw input ----
+  const acmeDoc = await prisma.knowledgeDocument.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      rawInputId: acmeRaw.id,
+      title: acmeRaw.title,
+      sourceType: "WEBSITE",
+      sourceName: "nordwind.test",
+      content: acmeRaw.rawText ?? "",
+      status: "ACTIVE",
+    },
+  });
+  await prisma.knowledgeChunk.createMany({
+    data: chunkText(acmeRaw.rawText ?? "").map((c) => ({
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      documentId: acmeDoc.id,
+      chunkIndex: c.index,
+      content: c.content,
+      metadata: { sourceType: "WEBSITE", title: acmeRaw.title },
+    })),
+  });
+
+  const acmeInsight = await prisma.clientInsight.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      insightType: "EXPERTISE",
+      title: "15+ Jahre Erfahrung in E-Mobilität",
+      content: "Langjährige Expertise als Aufhänger für Fachbeiträge.",
+      confidence: 70,
+      status: "APPROVED",
+    },
+  });
+
+  await prisma.clientInsight.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      insightType: "PROOF_POINT",
+      title: "40 % Wachstum",
+      content: "Starkes Wachstum als Zahlen-Story nutzbar.",
+      confidence: 65,
+      status: "APPROVED",
+    },
+  });
+
+  const acmeTopic = await prisma.topicIdea.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      campaignId: acmeCampaign.id,
+      title: "Wie E-Bikes die Innenstädte verändern",
+      description: "Trend-Story mit Einordnung durch Nordwind Mobility.",
+      mediaAngle: "Trend-Story mit Einordnung",
+      targetMediaType: "Online-Leitmedien",
+      searchPotential: "HIGH",
+      newsValue: "HIGH",
+      priority: "HIGH",
+      status: "APPROVED",
+    },
+  });
+
+  const acmeBriefing = await prisma.briefing.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      campaignId: acmeCampaign.id,
+      topicIdeaId: acmeTopic.id,
+      mediaContactId: acmeContacts[0].id,
+      title: "Briefing: E-Bikes in Innenstädten",
+      targetAudience: "Online-Leitmedien",
+      angle: "Trend-Story mit Einordnung",
+      keyMessages: "1. Verkehrswende\n2. 40 % Wachstum\n3. Nachhaltigkeit",
+      status: "APPROVED",
+    },
+  });
+
+  await prisma.articleDraft.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      campaignId: acmeCampaign.id,
+      briefingId: acmeBriefing.id,
+      title: "E-Bikes in Innenstädten",
+      subtitle: "Wie nachhaltige Mobilität die Stadt verändert",
+      articleText:
+        "## Einleitung\n\nStädte verändern sich.\n\n## Hauptteil\n\nNordwind Mobility ...\n\n## Fazit\n\nDie Zukunft ist elektrisch.",
+      targetMedium: "Online-Leitmedien",
+      status: "REVIEW",
+    },
+  });
+
+  await prisma.publication.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      campaignId: acmeCampaign.id,
+      mediaContactId: acmeContacts[2].id,
+      title: "Gastbeitrag: E-Mobilität im Alltag",
+      url: "https://test-blog.test/e-mobilitaet",
+      publicationDate: new Date("2026-03-01"),
+      resultingTopic: "E-Mobilität im Alltag",
+      resultingAngle: "Servicenutzen",
+      sourceOutreachId: acmePubOutreach.id,
+    },
+  });
+
+  // Log media interactions (the learning signal).
+  await prisma.mediaInteraction.createMany({
+    data: [
+      {
+        organizationId: acme.id,
+        mediaContactId: acmeContacts[2].id,
+        outreachId: acmePubOutreach.id,
+        interactionType: "PUBLICATION",
+        result: "PUBLISHED",
+        topicTitle: "E-Mobilität im Alltag",
+        mediaAngle: "Servicenutzen",
+      },
+      {
+        organizationId: acme.id,
+        mediaContactId: acmeContacts[0].id,
+        interactionType: "RESPONSE",
+        result: "INTERESTED",
+        topicTitle: "Vorab-Test City-E-Bike",
+        mediaAngle: "Produkttest",
+      },
+    ],
+  });
+
+  // ---- Media import & research demo (provenance) ----
+  await prisma.mediaImportSession.create({
+    data: {
+      organizationId: acme.id,
+      sourceType: "ZIMPEL",
+      importedByUserId: acmeOwner.id,
+      fileName: "zimpel-export-mobilitaet.csv",
+      importedRecords: 3,
+      validRecords: 3,
+      invalidRecords: 0,
+      status: "COMPLETED",
+      notes: "3 neu, 0 aktualisiert, 0 übersprungen",
+    },
+  });
+
+  await prisma.mediaResearchResult.createMany({
+    data: [
+      {
+        organizationId: acme.id,
+        clientId: acmeClientA.id,
+        campaignId: acmeCampaign.id,
+        topicIdeaId: acmeTopic.id,
+        mediumName: "Fachmagazin zu „E-Mobilität in Städten“ (recherchieren)",
+        mediaType: "Fachpresse",
+        section: "Mobilität",
+        relevanceReason: "Passt thematisch zu E-Mobilität. Vorschlag zur manuellen Prüfung.",
+        suggestedAngle: "Einordnung von E-Mobilität in Städten",
+        confidence: 45,
+        status: "SUGGESTED",
+      },
+      {
+        organizationId: acme.id,
+        clientId: acmeClientA.id,
+        campaignId: acmeCampaign.id,
+        topicIdeaId: acmeTopic.id,
+        mediumName: "Regionalzeitung zu „E-Mobilität in Städten“ (recherchieren)",
+        mediaType: "Regionalmedium",
+        section: "Lokales",
+        relevanceReason: "Regionaler Bezug zur Verkehrswende. Vorschlag zur manuellen Prüfung.",
+        suggestedAngle: "Lokale Verkehrswende",
+        confidence: 40,
+        status: "SUGGESTED",
+      },
+    ],
+  });
+
+  // Reference the raw input + insight so unused-var checks stay clean.
+  void acmeRaw;
+  void acmeInsight;
+
+  await prisma.writingRuleSet.createMany({
+    data: [
+      {
+        organizationId: acme.id,
+        name: "Redaktioneller PR-Pitch",
+        description: "Kurzer, redaktioneller Themen-Pitch an Medienkontakte.",
+        textType: "PITCH",
+        targetMediumType: "Allgemein",
+        toneOfVoice: "redaktionell, freundlich, nicht werblich",
+        rules: "Persönlich ansprechen. Mediennutzen klar benennen. Kein Verkauf.",
+        forbiddenPhrases: ["exklusives angebot", "weltbeste"],
+        requiredElements: [
+          "persönliche Ansprache",
+          "klarer Themenvorschlag",
+          "redaktioneller Nutzen",
+          "Expertenkontext",
+        ],
+        minWords: 80,
+        maxWords: 220,
+        allowAnglicisms: false,
+        allowFirstPerson: true,
+      },
+      {
+        organizationId: acme.id,
+        name: "Sachlicher Follow-up",
+        description: "Kurzes, nicht drängendes Nachfassen.",
+        textType: "FOLLOW_UP",
+        toneOfVoice: "kurz, sachlich, freundlich",
+        rules: "Maximal kurz. Bezug auf das Thema. Nicht drängen.",
+        requiredElements: ["Themenbezug", "freundlicher Abschluss"],
+        minWords: 40,
+        maxWords: 120,
+        allowAnglicisms: false,
+        allowFirstPerson: true,
+      },
+      {
+        organizationId: acme.id,
+        name: "Expertenartikel",
+        description: "Einordnender Fachbeitrag mit Beispielen.",
+        textType: "ARTICLE",
+        targetMediumType: "Fach- und Leitmedien",
+        toneOfVoice: "sachlich, kompetent, einordnend",
+        rules: "Aktiv schreiben. Fachbegriffe erklären. Beispiele nutzen.",
+        forbiddenPhrases: ["revolutionär", "marktführend", "innovative lösung"],
+        requiredElements: [
+          "eigenständiger Einstieg",
+          "These oder Problemstellung",
+          "Argumentation",
+          "Beispiele",
+        ],
+        preferredStructure: "Einstieg\nProblem\nEinordnung\nBeleg/Beispiel\nAusblick",
+        minWords: 500,
+        maxWords: 1000,
+        allowAnglicisms: false,
+        allowFirstPerson: false,
+      },
+      {
+        organizationId: acme.id,
+        name: "Servicetext für Verbrauchermedien",
+        description: "Nutzwert-orientierter Text für ein breites Publikum.",
+        textType: "ARTICLE",
+        targetMediumType: "Verbrauchermedien",
+        toneOfVoice: "verständlich, alltagsnah",
+        rules: "Einfache Sprache. Konkreter Nutzen. Keine Fachsprache ohne Erklärung.",
+        requiredElements: ["Alltagsnutzen", "konkrete Tipps", "Beispiele"],
+        minWords: 350,
+        maxWords: 700,
+        allowAnglicisms: false,
+        allowFirstPerson: false,
+      },
+      {
+        organizationId: acme.id,
+        name: "Fachmedien-Beitrag",
+        description: "Tiefer Fachbeitrag für ein Fachpublikum.",
+        textType: "ARTICLE",
+        targetMediumType: "Fachmedien",
+        toneOfVoice: "präzise fachlich, sachlich",
+        rules: "Fachlich korrekt. Quellen nur, wenn belegt. Keine Werbesprache.",
+        requiredElements: ["Fachkontext", "Argumentation", "belegbare Aussagen"],
+        minWords: 600,
+        maxWords: 1200,
+        allowAnglicisms: true,
+        allowFirstPerson: false,
+      },
+      {
+        organizationId: acme.id,
+        name: "Kundenreport",
+        description: "Sachlicher Report über PR-Aktivitäten und Ergebnisse.",
+        textType: "OTHER",
+        targetMediumType: "Kunde",
+        toneOfVoice: "sachlich, transparent",
+        rules: "Nur belegbare Ergebnisse. Klar strukturieren. Keine Schönfärberei.",
+        requiredElements: ["Zeitraum", "Maßnahmen", "Ergebnisse", "nächste Schritte"],
+        minWords: 200,
+        maxWords: 800,
+        allowAnglicisms: false,
+        allowFirstPerson: false,
+      },
+    ],
+  });
+
+  // ---- Knowledge layer + graph demo (built from raw inputs) ----
+  const acmeTopicNode = await prisma.knowledgeNode.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      type: "TOPIC_FIELD",
+      label: "E-Mobilität in Städten",
+      description: "Themenfeld rund um nachhaltige urbane Mobilität.",
+    },
+  });
+  const acmeExpNode = await prisma.knowledgeNode.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      type: "EXPERTISE",
+      label: "15+ Jahre Erfahrung",
+      description: "Langjährige Expertise im E-Bike-Bereich.",
+    },
+  });
+  await prisma.knowledgeEdge.create({
+    data: {
+      organizationId: acme.id,
+      clientId: acmeClientA.id,
+      relation: "supports",
+      fromNodeId: acmeExpNode.id,
+      toNodeId: acmeTopicNode.id,
+    },
+  });
+
+  await prisma.clientKnowledge.createMany({
+    data: [
+      {
+        organizationId: acme.id,
+        clientId: acmeClientA.id,
+        category: "EXPERTISE",
+        title: "15+ Jahre Erfahrung in E-Mobilität",
+        content: "Langjährige Expertise als Aufhänger für Fachbeiträge.",
+        confidence: 70,
+        sourceIds: [acmeRaw.id],
+      },
+      {
+        organizationId: acme.id,
+        clientId: acmeClientA.id,
+        category: "TOPIC_FIELD",
+        title: "E-Mobilität in Städten",
+        content: "Trend-Thema mit hohem Suchpotenzial.",
+        confidence: 65,
+        sourceIds: [acmeRaw.id],
+      },
+    ],
+  });
+
+  await prisma.aIUsageLog.create({
+    data: {
+      organizationId: acme.id,
+      userId: acmeOwner.id,
+      agent: "topicAgent",
+      provider: "mock",
+      mode: "mock",
+      model: "mock-1",
+      latencyMs: 3,
+      success: true,
     },
   });
 
@@ -205,10 +630,15 @@ async function main() {
       campaignId: globeCampaign.id,
       mediaContactId: globeContact.id,
       subject: "Finanzierungsrunde Polaris Software",
-      status: "REPLIED",
+      status: "INTERESTED",
       sentAt: new Date("2026-05-10"),
     },
   });
+
+  // Build media intelligence (MediaPerformance + JournalistPreference) from the
+  // seeded interactions.
+  await recomputeAllContacts(acme.id);
+  await recomputeAllContacts(globe.id);
 
   console.log("Seed complete.");
   console.log("");

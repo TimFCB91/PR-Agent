@@ -16,7 +16,17 @@ import {
 
 type Action = (prev: FormState, formData: FormData) => Promise<FormState>;
 
-const STATUSES = ["PLANNED", "SENT", "REPLIED", "DECLINED"] as const;
+const STATUSES = [
+  "DRAFT",
+  "READY",
+  "SENT",
+  "FOLLOW_UP_DUE",
+  "INTERESTED",
+  "ACCEPTED",
+  "DECLINED",
+  "ARTICLE_DELIVERED",
+  "PUBLISHED",
+] as const;
 
 function toDateInput(value?: Date | string | null): string {
   if (!value) return "";
@@ -32,7 +42,34 @@ export interface OutreachFormValues {
   campaignId?: string;
   mediaContactId?: string;
   sentAt?: Date | string | null;
+  pitchEmail?: string | null;
+  followUpEmail?: string | null;
+  lastContactDate?: Date | string | null;
+  nextFollowUpDate?: Date | string | null;
+  agreedTopic?: string | null;
+  publicationUrl?: string | null;
+  internalNotes?: string | null;
+  nextStep?: string | null;
+  channel?: string | null;
+  waitingOn?: string | null;
+  threadUrl?: string | null;
+  responseReceivedAt?: Date | string | null;
+  responseType?: string | null;
+  responseSummary?: string | null;
+  rejectionReason?: string | null;
+  acceptedAngle?: string | null;
+  publicationCreated?: boolean | null;
 }
+
+const RESPONSE_TYPES = [
+  "NO_RESPONSE",
+  "INTERESTED",
+  "ACCEPTED",
+  "DECLINED",
+  "NEEDS_MORE_INFO",
+  "OUT_OF_OFFICE",
+  "WRONG_CONTACT",
+] as const;
 
 export function OutreachForm({
   action,
@@ -113,7 +150,7 @@ export function OutreachForm({
             <Select
               id="status"
               name="status"
-              defaultValue={defaults?.status ?? "PLANNED"}
+              defaultValue={defaults?.status ?? "DRAFT"}
             >
               {STATUSES.map((s) => (
                 <option key={s} value={s}>
@@ -137,10 +174,192 @@ export function OutreachForm({
           <Textarea
             id="message"
             name="message"
-            rows={5}
+            rows={4}
             defaultValue={defaults?.message ?? ""}
           />
         </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="agreedTopic">Vereinbartes Thema</Label>
+            <Input
+              id="agreedTopic"
+              name="agreedTopic"
+              defaultValue={defaults?.agreedTopic ?? ""}
+            />
+          </div>
+          <div>
+            <Label htmlFor="publicationUrl">Veröffentlichungs-URL</Label>
+            <Input
+              id="publicationUrl"
+              name="publicationUrl"
+              defaultValue={defaults?.publicationUrl ?? ""}
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="lastContactDate">Letzter Kontakt</Label>
+            <Input
+              id="lastContactDate"
+              name="lastContactDate"
+              type="date"
+              defaultValue={toDateInput(defaults?.lastContactDate)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="nextFollowUpDate">Nächstes Follow-up</Label>
+            <Input
+              id="nextFollowUpDate"
+              name="nextFollowUpDate"
+              type="date"
+              defaultValue={toDateInput(defaults?.nextFollowUpDate)}
+            />
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="pitchEmail">Pitch-E-Mail</Label>
+          <Textarea
+            id="pitchEmail"
+            name="pitchEmail"
+            rows={4}
+            defaultValue={defaults?.pitchEmail ?? ""}
+          />
+        </div>
+        <div>
+          <Label htmlFor="followUpEmail">Follow-up-E-Mail</Label>
+          <Textarea
+            id="followUpEmail"
+            name="followUpEmail"
+            rows={3}
+            defaultValue={defaults?.followUpEmail ?? ""}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="channel">Versandkanal</Label>
+            <Select
+              id="channel"
+              name="channel"
+              defaultValue={defaults?.channel ?? ""}
+            >
+              <option value="">— keiner —</option>
+              <option value="ZIMPEL">Zimpel</option>
+              <option value="GMAIL">Gmail</option>
+              <option value="OUTLOOK">Outlook</option>
+              <option value="PHONE">Telefon</option>
+              <option value="OTHER">Sonstiges</option>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="nextStep">Nächster Schritt</Label>
+            <Input
+              id="nextStep"
+              name="nextStep"
+              defaultValue={defaults?.nextStep ?? ""}
+            />
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="waitingOn">Wer ist am Zug?</Label>
+          <Select
+            id="waitingOn"
+            name="waitingOn"
+            defaultValue={defaults?.waitingOn ?? "NONE"}
+          >
+            <option value="NONE">Automatisch (aus Status)</option>
+            <option value="AGENCY">Wir (Agentur)</option>
+            <option value="CLIENT">Kunde</option>
+            <option value="MEDIA">Medium</option>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="threadUrl">E-Mail-Verlauf (Link)</Label>
+          <Input
+            id="threadUrl"
+            name="threadUrl"
+            placeholder="Direkter Link zum Mail-Thread (Gmail/Outlook)"
+            defaultValue={defaults?.threadUrl ?? ""}
+          />
+        </div>
+        <div>
+          <Label htmlFor="internalNotes">Interne Notizen</Label>
+          <Textarea
+            id="internalNotes"
+            name="internalNotes"
+            rows={3}
+            defaultValue={defaults?.internalNotes ?? ""}
+          />
+        </div>
+
+        {/* Media intelligence — capture the response to feed the learning loop. */}
+        <div className="rounded-md border border-gray-200 p-4">
+          <p className="mb-3 text-sm font-semibold text-gray-900">
+            Reaktion erfassen (Media Intelligence)
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="responseType">Reaktionstyp</Label>
+              <Select
+                id="responseType"
+                name="responseType"
+                defaultValue={defaults?.responseType ?? ""}
+              >
+                <option value="">— keine —</option>
+                {RESPONSE_TYPES.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="responseReceivedAt">Antwort erhalten am</Label>
+              <Input
+                id="responseReceivedAt"
+                name="responseReceivedAt"
+                type="date"
+                defaultValue={toDateInput(defaults?.responseReceivedAt)}
+              />
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="acceptedAngle">Akzeptierter Winkel</Label>
+              <Input
+                id="acceptedAngle"
+                name="acceptedAngle"
+                defaultValue={defaults?.acceptedAngle ?? ""}
+              />
+            </div>
+            <div>
+              <Label htmlFor="rejectionReason">Ablehnungsgrund</Label>
+              <Input
+                id="rejectionReason"
+                name="rejectionReason"
+                defaultValue={defaults?.rejectionReason ?? ""}
+              />
+            </div>
+          </div>
+          <div className="mt-4">
+            <Label htmlFor="responseSummary">Zusammenfassung der Reaktion</Label>
+            <Textarea
+              id="responseSummary"
+              name="responseSummary"
+              rows={2}
+              defaultValue={defaults?.responseSummary ?? ""}
+            />
+          </div>
+          <label className="mt-4 flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              name="publicationCreated"
+              defaultChecked={defaults?.publicationCreated ?? false}
+            />
+            Veröffentlichung entstanden
+          </label>
+        </div>
+
         <div className="flex gap-2">
           <Button type="submit" disabled={pending}>
             {pending ? "Speichern…" : submitLabel}

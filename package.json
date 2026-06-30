@@ -18,13 +18,18 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.105.0",
     "@auth/prisma-adapter": "^2.7.4",
     "@prisma/client": "^6.2.1",
     "bcryptjs": "^2.4.3",
+    "mammoth": "^1.12.0",
     "next": "15.1.4",
     "next-auth": "5.0.0-beta.25",
+    "openai": "^6.44.0",
+    "pdf-parse": "^2.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "xlsx": "^0.18.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {

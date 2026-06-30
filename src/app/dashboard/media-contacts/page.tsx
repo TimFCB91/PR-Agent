@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { requireTenant, canWrite } from "@/lib/tenant";
 import { deleteMediaContactAction } from "@/actions/media-contacts";
 import { DeleteButton } from "@/components/delete-button";
-import { Card, PageHeader, LinkButton, EmptyState } from "@/components/ui";
-import { ImportForm } from "./import-form";
+import { Card, PageHeader, LinkButton, EmptyState, Badge } from "@/components/ui";
+import { FileImportForm } from "./file-import-form";
 
 export default async function MediaContactsPage() {
   const { organizationId, role } = await requireTenant();
@@ -22,17 +22,26 @@ export default async function MediaContactsPage() {
         title="Medienkontakte"
         description="Journalist:innen und Redaktionen"
         action={
-          writable && (
-            <LinkButton href="/dashboard/media-contacts/new">
-              Neuer Kontakt
+          <div className="flex gap-2">
+            <LinkButton
+              href="/api/export/media-contacts"
+              variant="secondary"
+              prefetch={false}
+            >
+              CSV-Export
             </LinkButton>
-          )
+            {writable && (
+              <LinkButton href="/dashboard/media-contacts/new">
+                Neuer Kontakt
+              </LinkButton>
+            )}
+          </div>
         }
       />
 
       {writable && (
         <div className="mb-6">
-          <ImportForm />
+          <FileImportForm />
         </div>
       )}
 
@@ -44,6 +53,7 @@ export default async function MediaContactsPage() {
             <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
               <tr>
                 <th className="px-5 py-3 font-medium">Name</th>
+                <th className="px-5 py-3 font-medium">Prio</th>
                 <th className="px-5 py-3 font-medium">E-Mail</th>
                 <th className="px-5 py-3 font-medium">Medium</th>
                 <th className="px-5 py-3 font-medium">Ressort</th>
@@ -54,7 +64,24 @@ export default async function MediaContactsPage() {
               {contacts.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="px-5 py-3 font-medium text-gray-900">
-                    {c.firstName} {c.lastName}
+                    <Link
+                      href={`/dashboard/media-contacts/${c.id}`}
+                      className="hover:underline"
+                    >
+                      {c.firstName} {c.lastName}
+                    </Link>
+                    {c.doNotContact && (
+                      <span className="ml-2 text-xs text-red-600">🚫 gesperrt</span>
+                    )}
+                    {c.relationship === "GOLD" && (
+                      <span className="ml-2 text-xs text-amber-600">★ Gold</span>
+                    )}
+                    {c.relationship === "BLACKLIST" && (
+                      <span className="ml-2 text-xs text-red-600">Blacklist</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3">
+                    <Badge value={c.priority} />
                   </td>
                   <td className="px-5 py-3 text-gray-600">{c.email}</td>
                   <td className="px-5 py-3 text-gray-600">{c.outlet ?? "—"}</td>

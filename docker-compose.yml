@@ -1,0 +1,50 @@
+# One-command local start:  docker compose up --build
+# Then open http://localhost:3000  (Login: owner@acme.test / password123)
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pr_agent
+    ports:
+      - "5432:5432"
+    volumes:
+      - pr_agent_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pr_agent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres@db:5432/pr_agent?schema=public"
+      # Fixed dev secret so no manual setup is needed (do NOT use in production).
+      AUTH_SECRET: "docker-dev-secret-please-change-0123456789abcdef"
+      # No fixed AUTH_URL: with AUTH_TRUST_HOST the app derives its URL from the
+      # incoming request, so it works on localhost AND behind the Codespaces
+      # (*.app.github.dev) proxy without any extra configuration.
+      AUTH_TRUST_HOST: "true"
+      # AI layer — Mock by default. To use real AI, create a .env file next to
+      # this docker-compose.yml (see .env.example) with at least:
+      #   AI_MODE=real
+      #   ANTHROPIC_API_KEY=sk-ant-...
+      # Compose substitutes these ${...} values from that .env automatically.
+      # Local/dev: seed the demo data so you have something to click through.
+      # In production (e.g. Render) this is NOT set, so the app starts empty.
+      SEED_DEMO: "true"
+      AI_MODE: "${AI_MODE:-mock}"
+      AI_PROVIDER: "${AI_PROVIDER:-anthropic}"
+      AI_MODEL: "${AI_MODEL:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+    ports:
+      - "3000:3000"
+
+volumes:
+  pr_agent_db:

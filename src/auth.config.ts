@@ -4,6 +4,10 @@ import type { NextAuthConfig, Session } from "next-auth";
 // or any Node-only module so it can be used inside the middleware (edge
 // runtime). The Credentials provider with database access lives in auth.ts.
 export const authConfig = {
+  // Trust the incoming request host. Required when the app is served from a
+  // proxied domain (e.g. GitHub Codespaces *.app.github.dev) instead of
+  // localhost; without it Auth.js throws UntrustedHost and every page 500s.
+  trustHost: true,
   pages: {
     signIn: "/login",
   },
