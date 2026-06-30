@@ -49,6 +49,7 @@ import {
 } from "@/actions/briefings";
 import {
   createArticleAction,
+  createArticleFromFileAction,
   updateArticleAction,
   updateArticleStatusAction,
   deleteArticleAction,
@@ -85,6 +86,7 @@ import {
   importReportingListAction,
 } from "@/actions/placements";
 import { ReportingImportForm } from "./_forms/reporting-import-form";
+import { ArticleFileImportForm } from "./_forms/article-file-import-form";
 import { InsightForm } from "./_forms/insight-form";
 import { TopicForm } from "./_forms/topic-form";
 import { BriefingForm } from "./_forms/briefing-form";
@@ -1656,9 +1658,13 @@ async function ArticlesTab({
   ]);
 
   const action = createArticleAction.bind(null, clientId);
+  const fileImportAction = createArticleFromFileAction.bind(null, clientId);
 
   return (
     <div className="space-y-4">
+      {writable && (
+        <ArticleFileImportForm action={fileImportAction} />
+      )}
       {writable && (
         <details>
           <summary className="cursor-pointer text-sm font-medium text-gray-700">

@@ -10,6 +10,90 @@ import { writeAccess } from "@/lib/action-helpers";
 import { articleSchema } from "@/lib/validations";
 import { fieldErrorsFromZod, type FormState } from "@/lib/form";
 import { checkArticle } from "@/lib/articles/articleQualityChecker";
+import { extractTextFromFile } from "@/lib/files/extractText";
+
+export interface ArticleFileImportState extends FormState {
+  fileName?: string;
+  chars?: number;
+}
+
+const ARTICLE_STATUSES = [
+  "DRAFT",
+  "REVIEW",
+  "APPROVED",
+  "SENT",
+  "PUBLISHED",
+  "ARCHIVED",
+] as const;
+
+/**
+ * Create an article from an uploaded file (Word/PDF/text) — e.g. a piece that
+ * was already written and submitted/published. The full extracted text is
+ * stored as the article body.
+ */
+export async function createArticleFromFileAction(
+  clientId: string,
+  _prev: ArticleFileImportState,
+  formData: FormData,
+): Promise<ArticleFileImportState> {
+  const acc = await writeAccess();
+  if (acc.errorState) return acc.errorState;
+  const { tenant } = acc;
+
+  const client = await prisma.client.findFirst({
+    where: { id: clientId, organizationId: tenant.organizationId },
+    select: { id: true },
+  });
+  if (!client) return { ok: false, error: "Kunde nicht gefunden." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Bitte eine Datei auswählen." };
+  }
+
+  const statusRaw = String(formData.get("status") ?? "PUBLISHED");
+  const status = (ARTICLE_STATUSES as readonly string[]).includes(statusRaw)
+    ? (statusRaw as ArticleStatus)
+    : "PUBLISHED";
+  const targetMedium = String(formData.get("targetMedium") ?? "").trim();
+
+  let extracted;
+  try {
+    extracted = await extractTextFromFile(file);
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Datei konnte nicht gelesen werden.",
+    };
+  }
+  if (!extracted.text) {
+    return {
+      ok: false,
+      error: "Aus der Datei konnte kein Text gelesen werden.",
+    };
+  }
+
+  // Use the first non-empty line as the title, the filename as a fallback.
+  const firstLine = extracted.text
+    .split("\n")
+    .map((l) => l.trim())
+    .find(Boolean);
+  const title = (firstLine ?? extracted.fileName).slice(0, 200);
+
+  await prisma.articleDraft.create({
+    data: {
+      organizationId: tenant.organizationId,
+      clientId,
+      title,
+      articleText: extracted.text,
+      targetMedium: targetMedium || undefined,
+      status,
+    },
+  });
+
+  rev(clientId);
+  return { ok: true, fileName: extracted.fileName, chars: extracted.text.length };
+}
 
 function rev(clientId: string) {
   revalidatePath(`/dashboard/clients/${clientId}`);
