@@ -67,6 +67,9 @@ const definition: AgentDefinition<KnowledgeAgentInput, KnowledgeAgentOutput> = {
   name: "knowledgeAgent",
   inputSchema: knowledgeInputSchema,
   outputSchema: knowledgeOutputSchema,
+  // Extraction can produce many entries with full-sentence content; give it a
+  // generous output budget so the JSON is never cut off mid-array.
+  maxTokens: 16000,
   buildMessages: (input) => PROMPTS.knowledgeAgent(input),
   // Deterministic fallback (only used when real AI is unavailable): reuse the
   // keyword-based builder so the workflow still degrades gracefully.

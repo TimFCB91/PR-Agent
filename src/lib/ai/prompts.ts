@@ -75,6 +75,8 @@ export const PROMPTS = {
         "Ermittle zusätzlich die Medienbereiche/Ressorts, in denen der Kunde " +
         "glaubwürdig als Experte auftreten kann (z. B. „Finanzen“, „Gesundheit“, " +
         "„Karriere“) — als kurze, eigenständige Begriffe.\n" +
+        "Erzeuge die wichtigsten Einträge, höchstens 25; lieber wenige starke " +
+        "als viele redundante. " +
         "confidence ist 0–100 (wie klar der Eintrag im Material belegt ist). " +
         "sources ist ein Array der Dokument-Referenzen (Feld \"ref\"), aus denen " +
         "der Eintrag stammt.\n" +

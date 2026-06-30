@@ -45,16 +45,71 @@ export interface AgentDefinition<I, O> {
   outputSchema: z.ZodType<O>;
   buildMessages: (input: I) => AIMessage[];
   mock: (input: I) => O;
+  /** Max output tokens for the real provider (defaults to the provider's own). */
+  maxTokens?: number;
+}
+
+/**
+ * Close any still-open brackets in a JSON string that was cut off (e.g. when
+ * the model hit its output-token limit mid-array). Keeps everything up to the
+ * last completed value and appends the matching closers, so a truncated
+ * response still yields all the complete elements instead of being discarded.
+ */
+function repairTruncatedJson(s: string): string {
+  let inStr = false;
+  let esc = false;
+  let lastSafe = -1;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === "}" || c === "]") lastSafe = i + 1; // a value just completed
+  }
+  if (lastSafe === -1) throw new Error("no complete JSON value to repair");
+
+  const head = s.slice(0, lastSafe);
+  const open: string[] = [];
+  inStr = false;
+  esc = false;
+  for (let i = 0; i < head.length; i++) {
+    const c = head[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === "{") open.push("}");
+    else if (c === "[") open.push("]");
+    else if (c === "}" || c === "]") open.pop();
+  }
+  return head + open.reverse().join("");
 }
 
 // Tolerant JSON extraction: strips ```json fences and isolates the outermost
-// object before parsing, since some models wrap output in prose.
+// object before parsing, since some models wrap output in prose. If the result
+// is truncated (over-length response), it is repaired to salvage what arrived.
 function extractJson(text: string): unknown {
   const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
   const slice = start !== -1 && end !== -1 ? cleaned.slice(start, end + 1) : cleaned;
-  return JSON.parse(slice);
+  try {
+    return JSON.parse(slice);
+  } catch (err) {
+    const fromStart = start !== -1 ? cleaned.slice(start) : cleaned;
+    try {
+      return JSON.parse(repairTruncatedJson(fromStart));
+    } catch {
+      throw err; // surface the original parse error
+    }
+  }
 }
 
 export async function runAgent<I, O>(
@@ -81,6 +136,7 @@ export async function runAgent<I, O>(
       const completion = await provider.complete({
         messages: def.buildMessages(input),
         json: true,
+        maxTokens: def.maxTokens,
       });
       model = completion.model;
       inputTokens = completion.inputTokens;
