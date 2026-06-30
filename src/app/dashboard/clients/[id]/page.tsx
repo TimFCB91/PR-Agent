@@ -20,6 +20,10 @@ import {
   type TopicMatch,
 } from "@/lib/matching/topicClientMatcher";
 import { loadClientProfiles } from "@/lib/matching/clientProfiles";
+import {
+  suggestMediaAreas,
+  type MediaAreaSuggestion,
+} from "@/lib/matching/mediaAreaSuggester";
 import { findTopicPool } from "@/lib/topics/topicPool";
 
 import {
@@ -504,6 +508,28 @@ async function InsightsTab({
 
 // ---------------------------------------------------------------------------
 
+function MediaAreaChip({ area }: { area: MediaAreaSuggestion }) {
+  const reachClass =
+    area.mediaReach > 0
+      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+      : "bg-gray-50 text-gray-500 border-gray-200";
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${reachClass}`}
+      title={
+        area.mediaReach > 0
+          ? `${area.mediaReach} passende Medienkontakte in der Datenbank`
+          : "Noch keine passenden Medienkontakte in der Datenbank"
+      }
+    >
+      <span className="font-medium">{area.area}</span>
+      <span className="rounded-full bg-white/70 px-1.5 text-[10px] font-semibold">
+        {area.mediaReach}
+      </span>
+    </span>
+  );
+}
+
 async function KnowledgeTab({
   clientId,
   organizationId,
@@ -513,12 +539,59 @@ async function KnowledgeTab({
   organizationId: string;
   writable: boolean;
 }) {
-  const items = await prisma.clientKnowledge.findMany({
-    where: { clientId, organizationId },
-    orderBy: { confidence: "desc" },
-  });
+  const [items, topics, mediaContacts] = await Promise.all([
+    prisma.clientKnowledge.findMany({
+      where: { clientId, organizationId },
+      orderBy: { confidence: "desc" },
+    }),
+    prisma.topicIdea.findMany({
+      where: { clientId, organizationId },
+      select: { title: true, description: true, mediaAngle: true },
+    }),
+    prisma.mediaContact.findMany({
+      where: { organizationId, doNotContact: false },
+      select: {
+        beat: true,
+        outlet: true,
+        notes: true,
+        lastSuccessfulTopic: true,
+        preferredAngles: true,
+      },
+    }),
+  ]);
 
   const createAction = createKnowledgeAction.bind(null, clientId);
+
+  // Theme/media-area suggestions — grounded only in real records: the client's
+  // own knowledge + topics, matched against the real media database.
+  const bits = [
+    ...items.map((k) => ({
+      text: `${k.title} ${k.content ?? ""}`,
+      confidence: k.confidence,
+    })),
+    ...topics.map((t) => ({
+      text: `${t.title} ${t.description ?? ""} ${t.mediaAngle ?? ""}`,
+      confidence: 60,
+    })),
+  ];
+  const mediaTexts = mediaContacts.map((m) =>
+    [m.beat, m.outlet, m.notes, m.lastSuccessfulTopic, ...m.preferredAngles]
+      .filter(Boolean)
+      .join(" "),
+  );
+  const mediaAreas = suggestMediaAreas(bits, mediaTexts, 8);
+
+  // Compact knowledge breakdown by category.
+  const byCategory = new Map<string, number>();
+  for (const k of items)
+    byCategory.set(k.category, (byCategory.get(k.category) ?? 0) + 1);
+  const categoryChips = [...byCategory.entries()].sort((a, b) => b[1] - a[1]);
+  const avgConfidence =
+    items.length > 0
+      ? Math.round(
+          items.reduce((s, k) => s + k.confidence, 0) / items.length,
+        )
+      : 0;
 
   return (
     <div className="space-y-4">
@@ -527,6 +600,61 @@ async function KnowledgeTab({
         automatisch aus den Rohinformationen; manuell angelegte/bearbeitete
         Einträge (Badge „manuell") bleiben dabei erhalten.
       </p>
+
+      {(items.length > 0 || mediaAreas.length > 0) && (
+        <Card className="p-5">
+          <p className="text-sm font-semibold text-gray-900">
+            Kompakt-Übersicht
+          </p>
+          <div className="mt-3 grid gap-5 md:grid-cols-2">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                Wissen ({items.length} Einträge · Ø {avgConfidence}% Konfidenz)
+              </p>
+              {categoryChips.length === 0 ? (
+                <p className="mt-2 text-sm text-gray-400">
+                  Noch kein Wissen hinterlegt.
+                </p>
+              ) : (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {categoryChips.map(([cat, n]) => (
+                    <span
+                      key={cat}
+                      className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-700"
+                    >
+                      <Badge value={cat} />
+                      <span className="font-medium">{n}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                Empfohlene Medienbereiche
+              </p>
+              {mediaAreas.length === 0 ? (
+                <p className="mt-2 text-sm text-gray-400">
+                  Sobald Wissen/Themen hinterlegt sind, werden hier passende
+                  Medienbereiche vorgeschlagen.
+                </p>
+              ) : (
+                <>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {mediaAreas.map((a) => (
+                      <MediaAreaChip key={a.area} area={a} />
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[11px] text-gray-400">
+                    Aus dem Wissen des Kunden abgeleitet; die Zahl zeigt
+                    passende Medienkontakte in der Datenbank.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {writable && (
         <div className="flex flex-wrap gap-2 mb-2">
@@ -558,11 +686,11 @@ async function KnowledgeTab({
       {items.length === 0 ? (
         <EmptyState message="Noch kein Wissen. Lege Rohinformationen an und klicke „Wissen aufbauen“ – oder lege oben manuell Wissen an." />
       ) : (
-        <Card className="overflow-hidden">
+        <Card className="rounded-lg">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-200 bg-gray-50 text-left">
               <tr>
-                <th className={th}>Kategorie</th>
+                <th className={`${th} rounded-tl-lg`}>Kategorie</th>
                 <th className={th}>Titel</th>
                 <th className={th}>Inhalt</th>
                 <th className={th}>Konfidenz</th>
@@ -577,11 +705,25 @@ async function KnowledgeTab({
                     <td className={td}>
                       <Badge value={k.category} />
                     </td>
-                    <td className="px-5 py-3 font-medium text-gray-900">
+                    <td className="px-5 py-3 font-medium text-gray-900 align-top">
                       {k.title}
                     </td>
-                    <td className={td}>
-                      <div className="max-w-md truncate">{k.content ?? "—"}</div>
+                    <td className={`${td} align-top`}>
+                      {k.content ? (
+                        <div className="group relative max-w-md">
+                          <div
+                            className="line-clamp-2 cursor-help whitespace-pre-wrap"
+                            title={k.content}
+                          >
+                            {k.content}
+                          </div>
+                          <div className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-[32rem] max-w-[80vw] whitespace-pre-wrap rounded-md border border-gray-200 bg-white p-3 text-xs leading-relaxed text-gray-700 shadow-xl group-hover:block">
+                            {k.content}
+                          </div>
+                        </div>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className={td}>{k.confidence}%</td>
                     <td className={td}>
