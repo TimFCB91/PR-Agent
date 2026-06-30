@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
 import { PageHeader, LinkButton } from "@/components/ui";
-import { ProfileForm, OrganizationForm } from "./profile-forms";
+import { ProfileForm, PasswordForm, OrganizationForm } from "./profile-forms";
 
 export default async function ProfileSettingsPage() {
   const { userId, organizationId } = await requireTenant();
@@ -32,6 +32,7 @@ export default async function ProfileSettingsPage() {
         }
       />
       <ProfileForm defaults={{ name: user.name, email: user.email }} />
+      <PasswordForm />
       <OrganizationForm defaults={{ name: org.name }} />
     </div>
   );

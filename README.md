@@ -445,6 +445,29 @@ Stoppen mit `Strg+C`; Daten zurücksetzen mit `docker compose down -v`.
 
 > Die KI läuft im **Mock-Modus** – kein API-Key/Internet nötig.
 
+## Live-Betrieb / Deployment (EU)
+
+Der Codespace/lokale Docker ist nur zum Ausprobieren. Für den echten Betrieb mit
+Team gibt es ein **Render-Blueprint** (`render.yaml`), das App + PostgreSQL in
+**Frankfurt (EU)** anlegt:
+
+1. Repo auf GitHub (erledigt).
+2. render.com → **New → Blueprint** → dieses Repo verbinden.
+3. Render liest `render.yaml`, erstellt Web-Service + Datenbank, generiert
+   `AUTH_SECRET` automatisch. Region: Frankfurt.
+4. Im Dashboard nur **`ANTHROPIC_API_KEY`** eintragen (für echte KI).
+5. Erzeugte URL öffnen → **`/register`** → echte Organisation mit **starkem
+   Passwort** anlegen.
+
+**Wichtig für Produktion:**
+- **Keine Demo-Logins**: In Produktion ist `SEED_DEMO` nicht gesetzt → die App
+  startet leer (kein `owner@acme.test`/`password123`). Demo-Daten gibt es nur
+  lokal (in `docker-compose.yml` ist `SEED_DEMO=true`).
+- **Passwort ändern** ist unter **Einstellungen → Profil & Organisation**
+  möglich.
+- **DSGVO**: EU-Region wählen und vor echtem Betrieb einen **AV-Vertrag** mit
+  dem Hoster *und* mit Anthropic abschließen.
+
 ## Lokales Setup (ohne Docker)
 
 ### Voraussetzungen
