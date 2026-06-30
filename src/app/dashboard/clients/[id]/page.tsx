@@ -35,7 +35,6 @@ import {
   createTopicAction,
   updateTopicAction,
   deleteTopicAction,
-  buildBriefingFromTopicAction,
 } from "@/actions/topics";
 import {
   createBriefingAction,
@@ -828,16 +827,16 @@ async function TopicsTab({
           <p className="font-medium text-gray-700">Was die Aktionen tun:</p>
           <ul className="mt-1 space-y-0.5">
             <li>
-              <strong>Briefing erstellen</strong> – legt aus dem Thema ein
-              Briefing an (Vorlage, ohne KI).
-            </li>
-            <li>
-              <strong>KI-Briefing</strong> – die KI schreibt das Briefing aus
-              Thema + Wissen.
+              <strong>Briefing erstellen</strong> – die KI schreibt aus Thema +
+              Wissen ein fertiges Briefing.
             </li>
             <li>
               <strong>Medien-Matching</strong> – sucht passende Medienkontakte
               zum Thema und legt Outreach an.
+            </li>
+            <li>
+              <strong>✎ Thema bearbeiten</strong> – unter jeder Zeile aufklappbar;
+              dort Titel, Aufhänger, Beschreibung usw. ändern.
             </li>
             <li>
               <strong>Löschen</strong> (🗑) – entfernt das Thema.
@@ -888,14 +887,10 @@ async function TopicsTab({
                       {writable && (
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           <ActionButton
-                            action={buildBriefingFromTopicAction}
-                            fields={{ id: it.id, clientId }}
-                            label="Briefing erstellen"
-                          />
-                          <ActionButton
                             action={buildBriefingViaAgentAction}
                             fields={{ id: it.id, clientId }}
-                            label="KI-Briefing"
+                            label="Briefing erstellen"
+                            variant="primary"
                           />
                           <ActionButton
                             action={matchAndCreateOutreachAction}
@@ -959,7 +954,7 @@ async function TopicsTab({
                       <td colSpan={8} className="px-5 pb-4">
                         <details>
                           <summary className="cursor-pointer text-sm font-medium text-gray-600">
-                            ✎ Bearbeiten / Details ansehen
+                            ✎ Thema bearbeiten
                           </summary>
                           <div className="mt-3 max-w-2xl">
                             <TopicForm

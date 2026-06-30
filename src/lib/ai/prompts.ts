@@ -101,8 +101,12 @@ export const PROMPTS = {
         "Eintrag zurück. Erfinde KEINE neuen Themen und lass keines weg. " +
         "title = das Thema als prägnante Überschrift. description = 1–2 ganze " +
         "Sätze aus dem Dokument-Kontext (keine Auslassungspunkte, kein " +
-        "abgeschnittener Text). mediaAngle = der Aufhänger/Pitch, falls genannt, " +
-        "sonst \"\". targetMediaType = passender Medientyp, falls erkennbar, " +
+        "abgeschnittener Text). mediaAngle = eine knappe 1-Satz-Zusammenfassung " +
+        "des Aufhängers (worum geht es, warum ist es für Medien interessant). " +
+        "Übernimm NIEMALS pauschale Standard-/Angebotssätze wie \"… berichtet " +
+        "darüber ausführlich in einem Gastbeitrag oder Interview\"; fasse " +
+        "stattdessen das Thema selbst zusammen. " +
+        "targetMediaType = passender Medientyp, falls erkennbar, " +
         "sonst \"\". searchPotential/newsValue/priority je LOW|MEDIUM|HIGH " +
         "(Einschätzung, im Zweifel MEDIUM).\n" +
         "Antworte ausschließlich mit gültigem JSON in genau dieser Form (keine " +
@@ -122,7 +126,9 @@ export const PROMPTS = {
         "Leite aus dem Kundenwissen konkrete Themenideen für die Medienarbeit " +
         "ab. title = prägnante Themen-Überschrift. description = 1–2 ganze Sätze, " +
         "worum es geht und warum es für Medien relevant ist (keine Floskeln, " +
-        "keine Auslassungspunkte). mediaAngle = der konkrete Aufhänger/Pitch. " +
+        "keine Auslassungspunkte). mediaAngle = eine knappe 1-Satz-" +
+        "Zusammenfassung des Aufhängers (worum geht es, warum für Medien " +
+        "relevant) — kein Standard-/Floskelsatz. " +
         "targetMediaType = passender Medientyp.",
       input,
       outputShape:
