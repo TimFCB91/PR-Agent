@@ -30,15 +30,7 @@ import {
   createRawInputAction,
   importRawInputFileAction,
   deleteRawInputAction,
-  processRawInputAction,
 } from "@/actions/raw-inputs";
-import {
-  createInsightAction,
-  updateInsightAction,
-  updateInsightStatusAction,
-  deleteInsightAction,
-  generateTopicsAction,
-} from "@/actions/insights";
 import {
   createTopicAction,
   updateTopicAction,
@@ -92,7 +84,6 @@ import {
 import { ReportingImportForm } from "./_forms/reporting-import-form";
 import { ArticleFileImportForm } from "./_forms/article-file-import-form";
 import { KnowledgeRebuildButton } from "./_forms/knowledge-rebuild-button";
-import { InsightForm } from "./_forms/insight-form";
 import { TopicForm } from "./_forms/topic-form";
 import { BriefingForm } from "./_forms/briefing-form";
 import { ArticleForm } from "./_forms/article-form";
@@ -101,7 +92,6 @@ import { PublicationForm } from "./_forms/publication-form";
 const TABS = [
   { key: "overview", label: "Übersicht" },
   { key: "raw", label: "Rohinformationen" },
-  { key: "insights", label: "Erkenntnisse" },
   { key: "knowledge", label: "Wissen" },
   { key: "graph", label: "Wissensgraph" },
   { key: "documents", label: "Wissensquellen" },
@@ -182,13 +172,6 @@ export default async function ClientDetailPage({
       {activeTab === "raw" && (
         <RawTab clientId={id} organizationId={organizationId} writable={writable} />
       )}
-      {activeTab === "insights" && (
-        <InsightsTab
-          clientId={id}
-          organizationId={organizationId}
-          writable={writable}
-        />
-      )}
       {activeTab === "knowledge" && (
         <KnowledgeTab
           clientId={id}
@@ -255,7 +238,6 @@ async function OverviewTab({
   const where = { clientId, organizationId };
   const [
     rawInputs,
-    insights,
     topics,
     briefings,
     articleDrafts,
@@ -263,7 +245,6 @@ async function OverviewTab({
     campaigns,
   ] = await Promise.all([
     prisma.clientRawInput.count({ where }),
-    prisma.clientInsight.count({ where }),
     prisma.topicIdea.count({ where }),
     prisma.briefing.count({ where }),
     prisma.articleDraft.count({ where }),
@@ -273,7 +254,6 @@ async function OverviewTab({
 
   const cards = [
     { label: "Rohinformationen", value: rawInputs },
-    { label: "Erkenntnisse", value: insights },
     { label: "Themen", value: topics },
     { label: "Briefings", value: briefings },
     { label: "Artikel", value: articleDrafts },
@@ -360,11 +340,6 @@ async function RawTab({
                   <td className="px-5 py-3">
                     {writable && (
                       <div className="flex items-center justify-end gap-2">
-                        <ActionButton
-                          action={processRawInputAction}
-                          fields={{ id: it.id, clientId }}
-                          label="Erkenntnisse generieren"
-                        />
                         <DeleteButton
                           id={it.id}
                           action={deleteRawInputAction}
@@ -374,130 +349,6 @@ async function RawTab({
                     )}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-
-async function InsightsTab({
-  clientId,
-  organizationId,
-  writable,
-}: {
-  clientId: string;
-  organizationId: string;
-  writable: boolean;
-}) {
-  const items = await prisma.clientInsight.findMany({
-    where: { clientId, organizationId },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const action = createInsightAction.bind(null, clientId);
-
-  return (
-    <div className="space-y-4">
-      {writable && (
-        <ActionButton
-          action={generateTopicsAction}
-          fields={{ clientId }}
-          label="Themen aus Erkenntnissen generieren"
-          variant="primary"
-        />
-      )}
-
-      {writable && (
-        <details>
-          <summary className="cursor-pointer text-sm font-medium text-gray-700">
-            ＋ Neue Erkenntnis
-          </summary>
-          <div className="mt-3">
-            <InsightForm action={action} />
-          </div>
-        </details>
-      )}
-
-      {items.length === 0 ? (
-        <EmptyState message="Noch keine Erkenntnisse." />
-      ) : (
-        <Card className="overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50 text-left">
-              <tr>
-                <th className={th}>Typ</th>
-                <th className={th}>Titel</th>
-                <th className={th}>Konfidenz</th>
-                <th className={th}>Status</th>
-                <th className={th} />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {items.map((it) => (
-                <Fragment key={it.id}>
-                  <tr className="hover:bg-gray-50">
-                    <td className={td}>
-                      <Badge value={it.insightType} />
-                    </td>
-                    <td className="px-5 py-3 font-medium text-gray-900">
-                      {it.title}
-                    </td>
-                    <td className={td}>{it.confidence}</td>
-                    <td className={td}>
-                      <Badge value={it.status} />
-                    </td>
-                    <td className="px-5 py-3">
-                      {writable && (
-                        <div className="flex items-center justify-end gap-2">
-                          <ActionButton
-                            action={updateInsightStatusAction}
-                            fields={{ id: it.id, clientId, status: "APPROVED" }}
-                            label="Freigeben"
-                          />
-                          <ActionButton
-                            action={updateInsightStatusAction}
-                            fields={{ id: it.id, clientId, status: "REJECTED" }}
-                            label="Ablehnen"
-                          />
-                          <DeleteButton
-                            id={it.id}
-                            action={deleteInsightAction}
-                            extraFields={{ clientId }}
-                          />
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                  {writable && (
-                    <tr>
-                      <td colSpan={5} className="px-5 pb-4">
-                        <details>
-                          <summary className="cursor-pointer text-sm font-medium text-gray-600">
-                            ✎ Bearbeiten / Inhalt ansehen
-                          </summary>
-                          <div className="mt-3 max-w-2xl">
-                            <InsightForm
-                              action={updateInsightAction.bind(null, clientId, it.id)}
-                              submitLabel="Änderungen speichern"
-                              defaults={{
-                                insightType: it.insightType,
-                                title: it.title,
-                                content: it.content,
-                                confidence: it.confidence,
-                                status: it.status,
-                              }}
-                            />
-                          </div>
-                        </details>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
               ))}
             </tbody>
           </table>
