@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import type { Level } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -490,15 +491,20 @@ export async function buildBriefingViaAgentAction(
     result.sourceReferences,
   );
 
-  // Quality review of the briefing's key messages.
-  await runAndStoreQuality({
-    entityType: "BRIEFING",
-    entityId: briefing.id,
-    organizationId: tenant.organizationId,
-    text: result.keyMessages,
-    evidence: await buildClientEvidence(topic.clientId, tenant.organizationId),
-    ruleSet: await getRuleSetForType(tenant.organizationId, "BRIEFING"),
-  });
+  // Quality review of the briefing's key messages (best-effort — must not
+  // break the workflow or block the redirect).
+  try {
+    await runAndStoreQuality({
+      entityType: "BRIEFING",
+      entityId: briefing.id,
+      organizationId: tenant.organizationId,
+      text: result.keyMessages,
+      evidence: await buildClientEvidence(topic.clientId, tenant.organizationId),
+      ruleSet: await getRuleSetForType(tenant.organizationId, "BRIEFING"),
+    });
+  } catch {
+    // ignore quality-check failures
+  }
 
   await prisma.topicIdea.updateMany({
     where: { id, organizationId: tenant.organizationId },
@@ -506,6 +512,8 @@ export async function buildBriefingViaAgentAction(
   });
 
   revClient(clientId);
+  // Jump straight to the Briefings tab so the new briefing is shown.
+  redirect(`/dashboard/clients/${clientId}?tab=briefings`);
 }
 
 /**
@@ -617,6 +625,8 @@ export async function buildArticleViaAgentAction(
   });
 
   revClient(clientId);
+  // Jump straight to the Artikel tab so the new draft is shown.
+  redirect(`/dashboard/clients/${clientId}?tab=articles`);
 }
 
 /**
@@ -707,6 +717,8 @@ export async function matchAndCreateOutreachAction(
 
   revClient(clientId);
   revalidatePath("/dashboard/outreach");
+  // Jump straight to the Outreach tab so the new entries are shown.
+  redirect(`/dashboard/clients/${clientId}?tab=outreach`);
 }
 
 /**
