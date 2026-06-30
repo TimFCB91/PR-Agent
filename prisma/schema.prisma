@@ -432,6 +432,7 @@ model Outreach {
   channel            OutreachChannel?
   nextStep           String?
   waitingOn          OutreachWaitingOn @default(NONE)
+  threadUrl          String? // direkter Link zum E-Mail-Verlauf (Gmail/Outlook)
   // Media intelligence — captured response signals.
   responseReceivedAt DateTime?
   responseType       ResponseType?

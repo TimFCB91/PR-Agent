@@ -52,6 +52,7 @@ export interface OutreachFormValues {
   nextStep?: string | null;
   channel?: string | null;
   waitingOn?: string | null;
+  threadUrl?: string | null;
   responseReceivedAt?: Date | string | null;
   responseType?: string | null;
   responseSummary?: string | null;
@@ -271,6 +272,15 @@ export function OutreachForm({
             <option value="CLIENT">Kunde</option>
             <option value="MEDIA">Medium</option>
           </Select>
+        </div>
+        <div>
+          <Label htmlFor="threadUrl">E-Mail-Verlauf (Link)</Label>
+          <Input
+            id="threadUrl"
+            name="threadUrl"
+            placeholder="Direkter Link zum Mail-Thread (Gmail/Outlook)"
+            defaultValue={defaults?.threadUrl ?? ""}
+          />
         </div>
         <div>
           <Label htmlFor="internalNotes">Interne Notizen</Label>

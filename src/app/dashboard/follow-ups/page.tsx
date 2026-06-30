@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireTenant, canWrite } from "@/lib/tenant";
 import { shouldFollowUp } from "@/lib/outreach/outreachManager";
+import { mailboxSearchUrl } from "@/lib/outreach/mail";
 import { FollowUpControl } from "../outreach/follow-up-control";
 import {
   Card,
@@ -39,6 +40,7 @@ export default async function FollowUpsPage() {
         select: {
           firstName: true,
           lastName: true,
+          email: true,
           outlet: true,
           priority: true,
           relationship: true,
@@ -121,7 +123,34 @@ export default async function FollowUpsPage() {
                   <td className={td}>{o.nextStep ?? "—"}</td>
                   <td className="px-5 py-3">
                     {writable && (
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {(() => {
+                          const search = mailboxSearchUrl({
+                            email: o.mediaContact.email,
+                            subject: o.subject,
+                            channel: o.channel,
+                          });
+                          return search ? (
+                            <a
+                              href={search}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs font-medium text-blue-700 underline"
+                            >
+                              ✉️ Postfach
+                            </a>
+                          ) : null;
+                        })()}
+                        {o.threadUrl && (
+                          <a
+                            href={o.threadUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs font-medium text-blue-700 underline"
+                          >
+                            🔗 Verlauf
+                          </a>
+                        )}
                         <FollowUpControl outreachId={o.id} />
                         <Link
                           href={`/dashboard/outreach/${o.id}/edit`}

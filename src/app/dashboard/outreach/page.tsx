@@ -12,6 +12,7 @@ import {
   waitingOnLabel,
 } from "@/lib/outreach/labels";
 import { ACCEPTED_STATUSES } from "@/lib/outreach/outreachManager";
+import { mailboxSearchUrl } from "@/lib/outreach/mail";
 import {
   Card,
   PageHeader,
@@ -29,7 +30,7 @@ export default async function OutreachPage() {
     orderBy: { createdAt: "desc" },
     include: {
       campaign: { select: { name: true } },
-      mediaContact: { select: { firstName: true, lastName: true } },
+      mediaContact: { select: { firstName: true, lastName: true, email: true } },
     },
   });
 
@@ -113,7 +114,14 @@ export default async function OutreachPage() {
                   </td>
                   <td className="px-5 py-3 text-gray-600">{o.campaign.name}</td>
                   <td className="px-5 py-3 text-gray-600">
-                    {o.mediaContact.firstName} {o.mediaContact.lastName}
+                    <div>
+                      {o.mediaContact.firstName} {o.mediaContact.lastName}
+                    </div>
+                    {o.mediaContact.email && (
+                      <div className="text-xs text-gray-400">
+                        {o.mediaContact.email}
+                      </div>
+                    )}
                   </td>
                   <td className="px-5 py-3">
                     <Badge value={statusLabel(o.status)} />
@@ -122,26 +130,57 @@ export default async function OutreachPage() {
                     {waitingOnLabel(effectiveWaitingOn(o))}
                   </td>
                   <td className="px-5 py-3">
-                    {writable && (
-                      <div className="flex items-center justify-end gap-2">
-                        <ActionButton
-                          action={generatePitchAction}
-                          fields={{ id: o.id }}
-                          label="Pitch generieren"
-                        />
-                        <FollowUpControl outreachId={o.id} />
-                        <Link
-                          href={`/dashboard/outreach/${o.id}/edit`}
-                          className="text-xs font-medium text-gray-700 underline"
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      {(() => {
+                        const search = mailboxSearchUrl({
+                          email: o.mediaContact.email,
+                          subject: o.subject,
+                          channel: o.channel,
+                        });
+                        return search ? (
+                          <a
+                            href={search}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs font-medium text-blue-700 underline"
+                            title="Mails mit diesem Kontakt im Postfach suchen"
+                          >
+                            ✉️ Postfach
+                          </a>
+                        ) : null;
+                      })()}
+                      {o.threadUrl && (
+                        <a
+                          href={o.threadUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-medium text-blue-700 underline"
+                          title="Direkt zum hinterlegten E-Mail-Verlauf"
                         >
-                          Bearbeiten
-                        </Link>
-                        <DeleteButton
-                          id={o.id}
-                          action={deleteOutreachAction}
-                        />
-                      </div>
-                    )}
+                          🔗 Verlauf
+                        </a>
+                      )}
+                      {writable && (
+                        <>
+                          <ActionButton
+                            action={generatePitchAction}
+                            fields={{ id: o.id }}
+                            label="Pitch generieren"
+                          />
+                          <FollowUpControl outreachId={o.id} />
+                          <Link
+                            href={`/dashboard/outreach/${o.id}/edit`}
+                            className="text-xs font-medium text-gray-700 underline"
+                          >
+                            Bearbeiten
+                          </Link>
+                          <DeleteButton
+                            id={o.id}
+                            action={deleteOutreachAction}
+                          />
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
