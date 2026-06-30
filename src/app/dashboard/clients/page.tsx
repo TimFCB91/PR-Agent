@@ -38,11 +38,26 @@ export default async function ClientsPage({
   const { q } = await searchParams;
   const query = (q ?? "").trim().toLowerCase();
 
-  const all = await prisma.client.findMany({
-    where: { organizationId, isTopicPool: false },
-    orderBy: [{ name: "asc" }],
-    include: { _count: { select: { campaigns: true } } },
-  });
+  const [all, placements] = await Promise.all([
+    prisma.client.findMany({
+      where: { organizationId, isTopicPool: false },
+      orderBy: [{ name: "asc" }],
+      include: { _count: { select: { campaigns: true } } },
+    }),
+    prisma.placement.findMany({
+      where: { organizationId },
+      select: { clientId: true, state: true },
+    }),
+  ]);
+
+  // Placements per client: total slots vs. already published.
+  const placeStats = new Map<string, { total: number; published: number }>();
+  for (const p of placements) {
+    const s = placeStats.get(p.clientId) ?? { total: 0, published: 0 };
+    s.total++;
+    if (p.state === "PUBLISHED") s.published++;
+    placeStats.set(p.clientId, s);
+  }
 
   const total = all.length;
   const activeCount = all.filter((c) => c.status === "ACTIVE").length;
@@ -124,6 +139,7 @@ export default async function ClientsPage({
                       <th className="px-5 py-3 font-medium">Status</th>
                       <th className="px-5 py-3 font-medium">Paket</th>
                       <th className="px-5 py-3 font-medium">Onboarding</th>
+                      <th className="px-5 py-3 font-medium">Platzierungen</th>
                       <th className="px-5 py-3 font-medium">Kampagnen</th>
                       <th className="px-5 py-3" />
                     </tr>
@@ -166,6 +182,27 @@ export default async function ClientsPage({
                           </td>
                           <td className="px-5 py-3 text-gray-600">
                             {fmtDate(client.onboardingDate)}
+                          </td>
+                          <td className="px-5 py-3">
+                            {(() => {
+                              const s = placeStats.get(client.id);
+                              const total = Math.max(
+                                client.placementGoal ?? 0,
+                                s?.total ?? 0,
+                              );
+                              if (total === 0)
+                                return <span className="text-gray-400">—</span>;
+                              const pub = s?.published ?? 0;
+                              return (
+                                <Link
+                                  href={`/dashboard/clients/${client.id}?tab=placements`}
+                                  className="font-medium text-blue-700 underline"
+                                  title="Zur Platzierungs-Übersicht"
+                                >
+                                  {pub}/{total}
+                                </Link>
+                              );
+                            })()}
                           </td>
                           <td className="px-5 py-3 text-gray-600">
                             {client._count.campaigns}

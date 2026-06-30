@@ -59,16 +59,17 @@ export async function importClientsExcelAction(
     // Map existing client names -> id (skip the internal topic pool).
     const existing = await prisma.client.findMany({
       where: { organizationId: org, isTopicPool: false },
-      select: { id: true, name: true },
+      select: { id: true, name: true, package: true },
     });
 
-    // Clean up legend/helper rows that an earlier import created as clients.
-    const legendIds = existing
-      .filter((c) => isLegendRow(c.name))
+    // Clean up junk an earlier import created: legend rows, and the section
+    // header rows (their package is the literal column label "Produkt").
+    const junkIds = existing
+      .filter((c) => isLegendRow(c.name) || c.package === "Produkt")
       .map((c) => c.id);
-    if (legendIds.length > 0) {
+    if (junkIds.length > 0) {
       const del = await prisma.client.deleteMany({
-        where: { id: { in: legendIds }, organizationId: org },
+        where: { id: { in: junkIds }, organizationId: org },
       });
       removed = del.count;
     }
