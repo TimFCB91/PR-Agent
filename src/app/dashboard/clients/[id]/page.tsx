@@ -40,7 +40,6 @@ import {
   createBriefingAction,
   updateBriefingAction,
   deleteBriefingAction,
-  buildArticleFromBriefingAction,
 } from "@/actions/briefings";
 import {
   createArticleAction,
@@ -1558,16 +1557,12 @@ async function BriefingsTab({
                     <td className={td}>{it.topicIdea?.title ?? "—"}</td>
                     <td className="px-5 py-3">
                       {writable && (
-                        <div className="flex items-center justify-end gap-2">
-                          <ActionButton
-                            action={buildArticleFromBriefingAction}
-                            fields={{ id: it.id, clientId }}
-                            label="Artikel erstellen"
-                          />
+                        <div className="flex flex-wrap items-center justify-end gap-2">
                           <ActionButton
                             action={buildArticleViaAgentAction}
                             fields={{ id: it.id, clientId }}
-                            label="KI-Artikel"
+                            label="Artikel erstellen"
+                            variant="primary"
                           />
                           <DeleteButton
                             id={it.id}
