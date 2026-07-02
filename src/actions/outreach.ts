@@ -275,4 +275,5 @@ export async function generatePitchAction(formData: FormData): Promise<void> {
   ]);
 
   revalidatePath("/dashboard/outreach");
+  if (clientId) revalidatePath(`/dashboard/clients/${clientId}`);
 }

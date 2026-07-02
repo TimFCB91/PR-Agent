@@ -14,6 +14,7 @@ import {
 import { runTopicAgent } from "@/lib/ai/agents/topicAgent";
 import { runTopicExtractAgent } from "@/lib/ai/agents/topicExtractAgent";
 import { extractTextFromFile } from "@/lib/files/extractText";
+import { getOrCreateDefaultCampaign } from "@/lib/campaigns/defaultCampaign";
 import { runBriefingAgent } from "@/lib/ai/agents/briefingAgent";
 import { runArticleAgent } from "@/lib/ai/agents/articleAgent";
 import { runMediaMatchingAgent } from "@/lib/ai/agents/mediaMatchingAgent";
@@ -644,7 +645,20 @@ export async function matchAndCreateOutreachAction(
     where: { id, organizationId: tenant.organizationId },
     include: { client: { select: { name: true, notes: true } } },
   });
-  if (!topic || !topic.campaignId) return;
+  if (!topic) return;
+
+  // Campaigns are invisible to the user: ensure the topic is attached to the
+  // client's (default) campaign so outreach can be created without the user
+  // ever having to set one up manually.
+  const campaignId =
+    topic.campaignId ??
+    (await getOrCreateDefaultCampaign(topic.clientId, tenant.organizationId)).id;
+  if (!topic.campaignId) {
+    await prisma.topicIdea.update({
+      where: { id: topic.id },
+      data: { campaignId },
+    });
+  }
 
   // Media intelligence: contacts with their historical performance stats.
   const contacts = await getContactStatsForMatching(tenant.organizationId);
@@ -696,7 +710,7 @@ export async function matchAndCreateOutreachAction(
     await prisma.outreach.create({
       data: {
         organizationId: tenant.organizationId,
-        campaignId: topic.campaignId,
+        campaignId,
         mediaContactId: match.mediaContactId,
         subject: topic.title,
         status: "DRAFT",
@@ -790,4 +804,5 @@ export async function generateFollowUpViaAgentAction(
   });
 
   revalidatePath("/dashboard/outreach");
+  revalidatePath(`/dashboard/clients/${outreach.campaign.client.id}`);
 }

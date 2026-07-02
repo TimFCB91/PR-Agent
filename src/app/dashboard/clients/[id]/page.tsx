@@ -54,6 +54,14 @@ import {
   updatePublicationAction,
   deletePublicationAction,
 } from "@/actions/publications";
+import { generatePitchAction } from "@/actions/outreach";
+import { mailboxSearchUrl } from "@/lib/outreach/mail";
+import {
+  statusLabel,
+  effectiveWaitingOn,
+  waitingOnLabel,
+} from "@/lib/outreach/labels";
+import { FollowUpControl } from "@/app/dashboard/outreach/follow-up-control";
 import {
   rebuildKnowledgeAction,
   rebuildTopicsAction,
@@ -200,7 +208,11 @@ export default async function ClientDetailPage({
         <ContactsTab organizationId={organizationId} />
       )}
       {activeTab === "outreach" && (
-        <OutreachTab clientId={id} organizationId={organizationId} />
+        <OutreachTab
+          clientId={id}
+          organizationId={organizationId}
+          writable={writable}
+        />
       )}
       {activeTab === "briefings" && (
         <BriefingsTab
@@ -1422,53 +1434,133 @@ async function ContactsTab({ organizationId }: { organizationId: string }) {
 async function OutreachTab({
   clientId,
   organizationId,
+  writable,
 }: {
   clientId: string;
   organizationId: string;
+  writable: boolean;
 }) {
   const items = await prisma.outreach.findMany({
     where: { organizationId, campaign: { clientId } },
     orderBy: { createdAt: "desc" },
     include: {
-      campaign: { select: { name: true } },
-      mediaContact: { select: { firstName: true, lastName: true } },
+      mediaContact: {
+        select: { firstName: true, lastName: true, email: true, outlet: true },
+      },
     },
   });
 
   return (
     <div className="space-y-4">
-      <LinkButton href="/dashboard/outreach" variant="secondary">
-        Zum Outreach
-      </LinkButton>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-gray-500">
+          Medien-Anschreiben für diesen Kunden. Entwürfe entstehen über
+          „Medien-Matching" beim Thema. Pitch erzeugen → im eigenen Postfach
+          senden → Status pflegen.
+        </p>
+        <LinkButton href="/dashboard/outreach" variant="secondary">
+          Gesamt-Outreach
+        </LinkButton>
+      </div>
 
       {items.length === 0 ? (
-        <EmptyState message="Noch kein Outreach." />
+        <EmptyState message="Noch kein Outreach. Gehe zu einem Thema und klicke „Medien-Matching“." />
       ) : (
-        <Card className="overflow-hidden">
-          <table className="w-full text-sm">
+        <Card className="overflow-x-auto">
+          <table className="w-full min-w-[820px] text-sm">
             <thead className="border-b border-gray-200 bg-gray-50 text-left">
               <tr>
                 <th className={th}>Betreff</th>
-                <th className={th}>Kampagne</th>
                 <th className={th}>Kontakt</th>
                 <th className={th}>Status</th>
+                <th className={th}>Am Zug</th>
+                <th className={th} />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {items.map((it) => (
-                <tr key={it.id} className="hover:bg-gray-50">
-                  <td className="px-5 py-3 font-medium text-gray-900">
-                    {it.subject}
-                  </td>
-                  <td className={td}>{it.campaign.name}</td>
-                  <td className={td}>
-                    {it.mediaContact.firstName} {it.mediaContact.lastName}
-                  </td>
-                  <td className={td}>
-                    <Badge value={it.status} />
-                  </td>
-                </tr>
-              ))}
+              {items.map((it) => {
+                const mailUrl = mailboxSearchUrl({
+                  email: it.mediaContact.email,
+                  subject: it.subject,
+                  channel: it.channel,
+                });
+                return (
+                  <Fragment key={it.id}>
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-5 py-3 font-medium text-gray-900">
+                        {it.subject}
+                      </td>
+                      <td className={td}>
+                        {it.mediaContact.firstName} {it.mediaContact.lastName}
+                        {it.mediaContact.outlet && (
+                          <span className="block text-xs text-gray-400">
+                            {it.mediaContact.outlet}
+                          </span>
+                        )}
+                      </td>
+                      <td className={td}>{statusLabel(it.status)}</td>
+                      <td className={td}>
+                        {waitingOnLabel(effectiveWaitingOn(it))}
+                      </td>
+                      <td className="px-5 py-3">
+                        {writable && (
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            <ActionButton
+                              action={generatePitchAction}
+                              fields={{ id: it.id, clientId }}
+                              label={it.pitchEmail ? "Pitch neu" : "Pitch generieren"}
+                              variant={it.pitchEmail ? "secondary" : "primary"}
+                            />
+                            {mailUrl && (
+                              <a
+                                href={mailUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="rounded-md border border-gray-200 px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                              >
+                                ✉️ Postfach
+                              </a>
+                            )}
+                            <FollowUpControl outreachId={it.id} clientId={clientId} />
+                            <LinkButton
+                              href={`/dashboard/outreach/${it.id}/edit`}
+                              variant="secondary"
+                            >
+                              Bearbeiten
+                            </LinkButton>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                    {(it.pitchEmail || it.followUpEmail) && (
+                      <tr>
+                        <td colSpan={5} className="px-5 pb-4">
+                          {it.pitchEmail && (
+                            <details>
+                              <summary className="cursor-pointer text-sm font-medium text-gray-600">
+                                ✉️ Pitch-Anschreiben ansehen / kopieren
+                              </summary>
+                              <pre className="mt-2 max-w-3xl whitespace-pre-wrap rounded-md bg-gray-50 p-3 text-xs text-gray-700">
+                                {it.pitchEmail}
+                              </pre>
+                            </details>
+                          )}
+                          {it.followUpEmail && (
+                            <details className="mt-2">
+                              <summary className="cursor-pointer text-sm font-medium text-gray-600">
+                                ↩︎ Follow-up-Text ansehen / kopieren
+                              </summary>
+                              <pre className="mt-2 max-w-3xl whitespace-pre-wrap rounded-md bg-gray-50 p-3 text-xs text-gray-700">
+                                {it.followUpEmail}
+                              </pre>
+                            </details>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </Card>
